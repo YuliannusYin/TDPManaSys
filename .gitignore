@@ -1,0 +1,37 @@
+# ========== IDE & Editor ==========
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.trae/
+
+# ========== Java / Maven ==========
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.log
+
+# ========== Node.js / Vue ==========
+node_modules/
+dist/
+*.local
+
+# ========== OS Files ==========
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ========== Environment & Secrets ==========
+.env
+.env.local
+.env.*.local
+
+# ========== Logs ==========
+logs/
+*.log
