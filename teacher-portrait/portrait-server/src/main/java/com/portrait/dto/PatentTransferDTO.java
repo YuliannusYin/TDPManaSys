@@ -15,4 +15,5 @@ public class PatentTransferDTO {
     private String transferee;
 
     private BigDecimal amount;
+    private Integer isCounted;
 }

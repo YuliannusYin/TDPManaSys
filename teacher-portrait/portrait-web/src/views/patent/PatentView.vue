@@ -8,9 +8,9 @@
     <el-card shadow="never" class="search-card">
       <el-form :model="queryForm" inline>
         <el-form-item label="专利名称">
-          <el-input v-model="queryForm.name" placeholder="请输入" clearable style="width:180px" />
+          <el-input v-model="queryForm.name" placeholder="请输入" clearable style="width:160px" />
         </el-form-item>
-        <el-form-item label="类型">
+        <el-form-item label="专利类型">
           <el-select v-model="queryForm.type" placeholder="全部" clearable style="width:120px">
             <el-option label="发明专利" value="发明专利" />
             <el-option label="实用新型" value="实用新型" />
@@ -37,27 +37,28 @@
       <el-table :data="tableData" v-loading="loading" stripe border style="width:100%">
         <el-table-column prop="id" label="ID" width="60" align="center" />
         <el-table-column prop="name" label="专利名称" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="type" label="类型" width="110" align="center">
+        <el-table-column prop="type" label="专利类型" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="typeTagType(row.type)" size="small">{{ row.type }}</el-tag>
+            <el-tag :type="typeColor(row.type)" size="small">{{ row.type }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="statusColor(row.status)" size="small">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="applicationNo" label="申请号" width="140" show-overflow-tooltip />
         <el-table-column prop="grantNo" label="授权号" width="140" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === '已授权' ? 'success' : ''" size="small">{{ row.status }}</el-tag>
-          </template>
-        </el-table-column>
         <el-table-column prop="applicationDate" label="申请日期" width="110" align="center" />
         <el-table-column prop="grantDate" label="授权日期" width="110" align="center" />
+        <el-table-column prop="inventors" label="发明人" min-width="120" show-overflow-tooltip />
         <el-table-column prop="teacherName" label="教师" width="100" align="center" />
-        <el-table-column label="考核" width="80" align="center">
+        <el-table-column prop="isCounted" label="考核" width="70" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.isCounted === 0 ? 'danger' : 'success'" size="small">{{ row.isCounted === 0 ? '否' : '是' }}</el-tag>
+            <el-tag :type="row.isCounted ? 'success' : 'info'" size="small">{{ row.isCounted ? '是' : '否' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
             <el-button v-if="row.status === '已授权'" type="warning" link :icon="Sell" @click="handleTransfer(row)">转让</el-button>
@@ -68,16 +69,19 @@
 
       <div class="pagination-wrap">
         <el-pagination
-          v-model:current-page="queryForm.page" v-model:page-size="queryForm.size"
-          :page-sizes="[10, 20, 50]" :total="total"
+          v-model:current-page="queryForm.page"
+          v-model:page-size="queryForm.size"
+          :page-sizes="[10, 20, 50]"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="fetchData" @current-change="fetchData"
+          @size-change="fetchData"
+          @current-change="fetchData"
         />
       </div>
     </el-card>
 
     <PatentFormDialog v-model:visible="dialogVisible" :edit-data="currentRow" @success="fetchData" />
-    <TransferDialog v-model:visible="transferVisible" :patent-data="currentRow" @success="fetchData" />
+    <TransferDialog v-model:visible="transferVisible" :patent-id="transferPatentId" :patent-name="transferPatentName" @success="fetchData" />
   </div>
 </template>
 
@@ -93,15 +97,16 @@ const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const dialogVisible = ref(false)
-const transferVisible = ref(false)
 const currentRow = ref(null)
+const transferVisible = ref(false)
+const transferPatentId = ref(null)
+const transferPatentName = ref('')
 
 const queryForm = reactive({
-  name: '', type: '', status: '', dateRange: null,
-  page: 1, size: 10
+  name: '', type: '', status: '', dateRange: null, page: 1, size: 10
 })
 
-onMounted(() => fetchData())
+onMounted(() => { fetchData() })
 
 async function fetchData() {
   loading.value = true
@@ -119,17 +124,19 @@ async function fetchData() {
 }
 
 function handleSearch() { queryForm.page = 1; fetchData() }
+
 function handleReset() {
   Object.assign(queryForm, { name: '', type: '', status: '', dateRange: null, page: 1, size: 10 })
   fetchData()
 }
+
 function handleAdd() { currentRow.value = null; dialogVisible.value = true }
 function handleEdit(row) { currentRow.value = { ...row }; dialogVisible.value = true }
-function handleTransfer(row) { currentRow.value = { ...row }; transferVisible.value = true }
+function handleTransfer(row) { transferPatentId.value = row.id; transferPatentName.value = row.name; transferVisible.value = true }
 
 async function handleDelete(row) {
   try {
-    await ElMessageBox.confirm(`确定要删除专利「${row.name}」吗？此操作不可恢复。`, '删除确认', {
+    await ElMessageBox.confirm(`确定要删除专利「${row.name}」吗？转让记录将同步删除。`, '删除确认', {
       confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning'
     })
     await deletePatent(row.id)
@@ -138,8 +145,12 @@ async function handleDelete(row) {
   } catch { /* cancelled */ }
 }
 
-function typeTagType(type) {
+function typeColor(type) {
   return { '发明专利': 'danger', '实用新型': 'warning', '外观设计': 'info' }[type] || 'info'
+}
+
+function statusColor(status) {
+  return status === '已授权' ? 'success' : ''
 }
 </script>
 
