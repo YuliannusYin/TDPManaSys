@@ -66,6 +66,9 @@ public class VerticalProjectService {
         if (entity == null) {
             throw new BusinessException("项目不存在");
         }
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权查看他人数据");
+        }
         VerticalProjectVO vo = new VerticalProjectVO();
         BeanUtils.copyProperties(entity, vo);
         User user = userMapper.selectById(entity.getUserId());
@@ -98,6 +101,9 @@ public class VerticalProjectService {
         if (entity == null) {
             throw new BusinessException("项目不存在");
         }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权修改他人数据");
+        }
 
         if (dto.getProjectNo() != null && !dto.getProjectNo().isEmpty()
                 && !dto.getProjectNo().equals(entity.getProjectNo())) {
@@ -112,7 +118,6 @@ public class VerticalProjectService {
 
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
-        entity.setUserId(getCurrentUserId());
         verticalProjectMapper.updateById(entity);
         return getById(id);
     }
@@ -121,6 +126,9 @@ public class VerticalProjectService {
         VerticalProject entity = verticalProjectMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException("项目不存在");
+        }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权删除他人数据");
         }
         verticalProjectMapper.deleteById(id);
     }
@@ -172,5 +180,9 @@ public class VerticalProjectService {
             throw new BusinessException(401, "未登录");
         }
         return userId;
+    }
+
+    private String getCurrentUserRole() {
+        return (String) request.getAttribute("role");
     }
 }
