@@ -66,6 +66,9 @@ public class SoftwareCopyrightService {
         if (entity == null) {
             throw new BusinessException("软著不存在");
         }
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权查看他人数据");
+        }
         return toVO(entity);
     }
 
@@ -84,12 +87,14 @@ public class SoftwareCopyrightService {
         if (entity == null) {
             throw new BusinessException("软著不存在");
         }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权修改他人数据");
+        }
 
         checkRegistrationNoUnique(dto.getRegistrationNo(), id);
 
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
-        entity.setUserId(getCurrentUserId());
         softwareCopyrightMapper.updateById(entity);
         return getById(id);
     }
@@ -98,6 +103,9 @@ public class SoftwareCopyrightService {
         SoftwareCopyright entity = softwareCopyrightMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException("软著不存在");
+        }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权删除他人数据");
         }
         softwareCopyrightMapper.deleteById(id);
     }
@@ -146,6 +154,10 @@ public class SoftwareCopyrightService {
 
         wrapper.orderByDesc(SoftwareCopyright::getRegistrationDate);
         return wrapper;
+    }
+
+    private String getCurrentUserRole() {
+        return (String) request.getAttribute("role");
     }
 
     private Long getCurrentUserId() {

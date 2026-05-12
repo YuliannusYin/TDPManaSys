@@ -66,6 +66,9 @@ public class CompetitionService {
         if (entity == null) {
             throw new BusinessException("竞赛记录不存在");
         }
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权查看他人数据");
+        }
         return toVO(entity);
     }
 
@@ -85,9 +88,11 @@ public class CompetitionService {
         if (entity == null) {
             throw new BusinessException("竞赛记录不存在");
         }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权修改他人数据");
+        }
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
-        entity.setUserId(getCurrentUserId());
         competitionMapper.updateById(entity);
         return getById(id);
     }
@@ -96,6 +101,9 @@ public class CompetitionService {
         Competition entity = competitionMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException("竞赛记录不存在");
+        }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权删除他人数据");
         }
         competitionMapper.deleteById(id);
     }
@@ -138,6 +146,10 @@ public class CompetitionService {
 
         wrapper.orderByDesc(Competition::getCompetitionDate);
         return wrapper;
+    }
+
+    private String getCurrentUserRole() {
+        return (String) request.getAttribute("role");
     }
 
     private Long getCurrentUserId() {

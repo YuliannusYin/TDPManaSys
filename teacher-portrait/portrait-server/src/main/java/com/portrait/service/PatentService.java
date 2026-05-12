@@ -74,6 +74,9 @@ public class PatentService {
         if (entity == null) {
             throw new BusinessException("专利不存在");
         }
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权查看他人数据");
+        }
         return toVO(entity);
     }
 
@@ -93,9 +96,11 @@ public class PatentService {
         if (entity == null) {
             throw new BusinessException("专利不存在");
         }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权修改他人数据");
+        }
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
-        entity.setUserId(getCurrentUserId());
         patentMapper.updateById(entity);
         return getById(id);
     }
@@ -104,6 +109,9 @@ public class PatentService {
         Patent entity = patentMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException("专利不存在");
+        }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权删除他人数据");
         }
         patentMapper.deleteById(id);
     }
@@ -183,6 +191,10 @@ public class PatentService {
 
         wrapper.orderByDesc(Patent::getApplicationDate);
         return wrapper;
+    }
+
+    private String getCurrentUserRole() {
+        return (String) request.getAttribute("role");
     }
 
     private Long getCurrentUserId() {

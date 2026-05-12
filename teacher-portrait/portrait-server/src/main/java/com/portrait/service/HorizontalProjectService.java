@@ -66,6 +66,9 @@ public class HorizontalProjectService {
         if (entity == null) {
             throw new BusinessException("项目不存在");
         }
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权查看他人数据");
+        }
         HorizontalProjectVO vo = new HorizontalProjectVO();
         BeanUtils.copyProperties(entity, vo);
         User user = userMapper.selectById(entity.getUserId());
@@ -93,6 +96,9 @@ public class HorizontalProjectService {
         if (entity == null) {
             throw new BusinessException("项目不存在");
         }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权修改他人数据");
+        }
 
         if (dto.getContractAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
             throw new BusinessException("合同金额必须大于0");
@@ -100,7 +106,6 @@ public class HorizontalProjectService {
 
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
-        entity.setUserId(getCurrentUserId());
         horizontalProjectMapper.updateById(entity);
         return getById(id);
     }
@@ -109,6 +114,9 @@ public class HorizontalProjectService {
         HorizontalProject entity = horizontalProjectMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException("项目不存在");
+        }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权删除他人数据");
         }
         horizontalProjectMapper.deleteById(id);
     }
@@ -149,6 +157,10 @@ public class HorizontalProjectService {
 
         wrapper.orderByDesc(HorizontalProject::getSignDate);
         return wrapper;
+    }
+
+    private String getCurrentUserRole() {
+        return (String) request.getAttribute("role");
     }
 
     private Long getCurrentUserId() {

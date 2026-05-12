@@ -93,6 +93,9 @@ public class PaperService {
         if (entity == null) {
             throw new BusinessException("论文不存在");
         }
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权查看他人数据");
+        }
         List<PaperIndex> indexes = paperIndexMapper.selectList(
                 new LambdaQueryWrapper<PaperIndex>().eq(PaperIndex::getPaperId, id));
         PaperVO vo = new PaperVO();
@@ -123,9 +126,11 @@ public class PaperService {
         if (entity == null) {
             throw new BusinessException("论文不存在");
         }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权修改他人数据");
+        }
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
-        entity.setUserId(getCurrentUserId());
         paperMapper.updateById(entity);
 
         paperIndexMapper.delete(new LambdaQueryWrapper<PaperIndex>().eq(PaperIndex::getPaperId, id));
@@ -138,6 +143,9 @@ public class PaperService {
         Paper entity = paperMapper.selectById(id);
         if (entity == null) {
             throw new BusinessException("论文不存在");
+        }
+        if (!entity.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权删除他人数据");
         }
         paperIndexMapper.delete(new LambdaQueryWrapper<PaperIndex>().eq(PaperIndex::getPaperId, id));
         paperMapper.deleteById(id);
@@ -197,6 +205,10 @@ public class PaperService {
 
         wrapper.orderByDesc(Paper::getPublishDate);
         return wrapper;
+    }
+
+    private String getCurrentUserRole() {
+        return (String) request.getAttribute("role");
     }
 
     private Long getCurrentUserId() {
