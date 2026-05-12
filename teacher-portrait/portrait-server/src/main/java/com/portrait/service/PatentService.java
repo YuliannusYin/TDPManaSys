@@ -48,6 +48,7 @@ public class PatentService {
 
         List<Long> userIds = page.getRecords().stream()
                 .map(Patent::getUserId).distinct().collect(Collectors.toList());
+
         Map<Long, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
                 : userMapper.selectBatchIds(userIds).stream()
                         .collect(Collectors.toMap(User::getId, Function.identity()));
@@ -60,13 +61,6 @@ public class PatentService {
                 vo.setTeacherName(user.getName());
                 vo.setTeacherCollege(user.getCollege());
             }
-            List<PatentTransfer> transfers = patentTransferMapper.selectList(
-                    new LambdaQueryWrapper<PatentTransfer>().eq(PatentTransfer::getPatentId, p.getId()));
-            vo.setTransfers(transfers.stream().map(t -> {
-                PatentTransferVO tvo = new PatentTransferVO();
-                BeanUtils.copyProperties(t, tvo);
-                return tvo;
-            }).collect(Collectors.toList()));
             return vo;
         }).collect(Collectors.toList());
 
@@ -86,10 +80,10 @@ public class PatentService {
     public PatentVO create(PatentDTO dto) {
         Patent entity = new Patent();
         BeanUtils.copyProperties(dto, entity);
-        entity.setUserId(getCurrentUserId());
         if (entity.getIsCounted() == null) {
             entity.setIsCounted(1);
         }
+        entity.setUserId(getCurrentUserId());
         patentMapper.insert(entity);
         return getById(entity.getId());
     }
@@ -121,16 +115,18 @@ public class PatentService {
             throw new BusinessException("专利不存在");
         }
         if (!"已授权".equals(patent.getStatus())) {
-            throw new BusinessException("仅已授权专利可进行转让");
+            throw new BusinessException("仅已授权专利可以转让");
         }
 
         PatentTransfer transfer = new PatentTransfer();
-        BeanUtils.copyProperties(dto, transfer);
         transfer.setPatentId(patentId);
+        BeanUtils.copyProperties(dto, transfer);
         patentTransferMapper.insert(transfer);
 
-        patent.setIsCounted(0);
-        patentMapper.updateById(patent);
+        if (dto.getIsCounted() != null) {
+            patent.setIsCounted(dto.getIsCounted());
+            patentMapper.updateById(patent);
+        }
 
         PatentTransferVO vo = new PatentTransferVO();
         BeanUtils.copyProperties(transfer, vo);
@@ -138,13 +134,15 @@ public class PatentService {
     }
 
     public List<PatentTransferVO> getTransfers(Long patentId) {
-        return patentTransferMapper.selectList(
-                new LambdaQueryWrapper<PatentTransfer>().eq(PatentTransfer::getPatentId, patentId))
-                .stream().map(t -> {
-                    PatentTransferVO vo = new PatentTransferVO();
-                    BeanUtils.copyProperties(t, vo);
-                    return vo;
-                }).collect(Collectors.toList());
+        List<PatentTransfer> transfers = patentTransferMapper.selectList(
+                new LambdaQueryWrapper<PatentTransfer>()
+                        .eq(PatentTransfer::getPatentId, patentId)
+                        .orderByDesc(PatentTransfer::getTransferDate));
+        return transfers.stream().map(t -> {
+            PatentTransferVO vo = new PatentTransferVO();
+            BeanUtils.copyProperties(t, vo);
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     private PatentVO toVO(Patent entity) {
@@ -155,13 +153,6 @@ public class PatentService {
             vo.setTeacherName(user.getName());
             vo.setTeacherCollege(user.getCollege());
         }
-        List<PatentTransfer> transfers = patentTransferMapper.selectList(
-                new LambdaQueryWrapper<PatentTransfer>().eq(PatentTransfer::getPatentId, entity.getId()));
-        vo.setTransfers(transfers.stream().map(t -> {
-            PatentTransferVO tvo = new PatentTransferVO();
-            BeanUtils.copyProperties(t, tvo);
-            return tvo;
-        }).collect(Collectors.toList()));
         return vo;
     }
 
