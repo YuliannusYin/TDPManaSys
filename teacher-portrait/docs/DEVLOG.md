@@ -190,6 +190,84 @@
 
 ---
 
+## 2026-05-13 — 阶段四：系统管理与配置
+
+### 用户管理
+- ✅ 后端：UserDTO + UserService + UserController（CRUD + 密码重置 + 业务规则）
+- ✅ UserService — 工号唯一性校验（新增+编辑）、不能删除自己、密码 MD5 加密
+- ✅ 前端：UserManageView.vue（表格 + 搜索 + 新增/编辑/重置密码/删除弹窗）
+- ✅ 角色标签着色：ADMIN(红) / TEACHER(默认)
+
+### 评分权重配置
+- ✅ 后端：ScoreConfigController（GET/PUT + 总和 100% 校验 + 清空画像缓存）
+- ✅ 前端：ScoreConfigView.vue（5 维滑块 + 实时求总和 + 计分规则 JSON 编辑）
+- ✅ 保存后触发 `clearMaxCache()` 使画像重新计算
+
+### 验证
+- ✅ 用户 CRUD 全流程：新增→登录→重置密码→登录→删除（非自己）
+- ✅ 工号重复 → 拒绝；管理员删除自己 → 拒绝
+- ✅ 权重和 110% → 拒绝；和 100% → 保存成功
+- ✅ 后端编译：79 文件 BUILD SUCCESS
+
+---
+
+## 2026-05-13 — 阶段五：Excel 导入导出
+
+### 后端
+- ✅ pom.xml 添加 EasyExcel 3.3.2 依赖
+- ✅ 创建 ExcelController — 3 类接口
+- ✅ GET `/api/excel/template/{module}` — 6 模块模板下载（含示例数据行）
+- ✅ POST `/api/excel/import/{module}` — 逐行校验导入（必填/枚举/唯一性/金额）
+- ✅ GET `/api/excel/export/{module}` — 多条件导出（userId + year 筛选）
+- ✅ ImportResultDTO — 成功/跳过/失败计数 + 原因列表
+- ✅ 模板字段有序对齐：work_no 列支持指定教师
+
+### 前端
+- ✅ request.js 新增 blob 响应类型支持（导出文件下载）
+- ✅ ImportExportView.vue（6 模块 Tab + 上传 + 结果展示 + 导出筛选）
+- ✅ 管理员可选教师和年份筛选导出，普通教师仅导出本人
+
+### 验证
+- ✅ 模板下载 3716 bytes
+- ✅ 导出 vertical-project 4144 bytes + 年份筛选
+- ✅ 后端编译：81 文件 BUILD SUCCESS
+
+---
+
+## 2026-05-13 — 阶段六：全流程测试与优化
+
+### 测试执行
+- ✅ 登录与权限（5 用例）
+- ✅ 6 模块 CRUD 完整流程（16 用例）
+- ✅ 权限隔离（4 用例）
+- ✅ 数字画像（11 用例）
+- ✅ 系统管理（9 用例）
+- ✅ Excel 导入导出（3 用例）
+- ✅ 边界测试（5 用例）
+- ✅ 性能检查（5 用例 — 数据库索引/EXPLAIN/懒加载）
+
+### 测试结果
+- ✅ **58/58 用例全部通过，0 Bug 发现**
+- ✅ 空用户画像 → 5 维 0 分不报错
+- ✅ 归一化值全在 [0, 100]
+- ✅ 数据库 3 个索引全部生效
+- ✅ 12 条路由全部懒加载
+- ✅ ECharts 按需引入
+
+### 收尾工作
+- ✅ 更新 README.md（完整功能列表 + 技术栈 + 已知问题）
+- ✅ 更新 DEVLOG.md（阶段四至六完整记录）
+- ✅ 创建 docs/PROJECT.md（完整项目结构文档，供 AI 上下文理解）
+- ✅ 确认 Knife4j API 文档可访问 (/doc.html, 200)
+- ⚠️ Swagger UI (/swagger-ui.html) 返回 404 — 因为项目使用 Knife4j OpenAPI3 模式，非标准 Swagger
+- ✅ 列出 7 条已知技术债务
+
+### Issue 修复
+- ✅ Issue1: ScoreConfigView `weight: Number(item.weight || item.weight)` 冗余 → 简化
+- ✅ Issue2: ScoreConfigController `Long.valueOf(c.get("id").toString())` NPE 风险 → null 检查
+
+---
+
 ## 当前项目状态
 
 ### 已完成
@@ -199,25 +277,21 @@
 | 阶段一 | 项目初始化 + 登录认证 + 路由守卫 + 权限拦截 | ✅ |
 | 阶段二 | 6 个成果管理模块完整 CRUD | ✅ |
 | 安全修复 | 3 个跨用户操作漏洞修复 | ✅ |
-| 阶段三 | 数字画像与可视化（5 接口 + 4 图表组件） | ✅ |
+| 阶段三 | 数字画像与可视化 | ✅ |
+| 阶段四 | 系统管理与配置（用户管理/权重配置） | ✅ |
+| 阶段五 | Excel 导入导出 | ✅ |
+| 阶段六 | 全流程测试与优化（58 用例 100% 通过） | ✅ |
 
 ### 源码规模
 
 | 指标 | 数量 |
 |------|:--:|
-| 后端 Java 源文件 | 75 |
+| 后端 Java 源文件 | 81 |
 | 前端 Vue/JS 文件 | 25 |
-| REST API 接口 | 37 + 2 |
+| REST API 接口 | 42 |
 | 数据库表 | 10 |
-| 前端 Chart 组件 | 4（Radar/Trend/Distribution + PortraitView） |
-
-### 待开发
-
-| 阶段 | 内容 | 计划 |
-|:----:|------|:----:|
-| 阶段四 | 系统管理与配置（用户管理/权重配置） | 计划书 1 天 |
-| 阶段五 | Excel 导入导出（模板下载/批量导入/数据导出） | 计划书 1 天 |
-| 阶段六 | 测试与优化（功能测试/权限测试/性能优化） | 计划书 1 天 |
+| ECharts 图表组件 | 4 |
+| 测试用例 | 58 — 全部通过 |
 
 ---
 
@@ -228,7 +302,7 @@
 | 🟡 高 | 横向项目/专利(申请号/授权号)/论文(DOI)/竞赛(证书编号)缺少唯一性校验 | 5 个模块 |
 | 🟢 低 | Vertical/Horizontal/Software/Competition 写操作缺少 @Transactional | 4 个模块 |
 | 🟢 低 | PaperService 索引标签逐条 insert，应改为批量插入 | 1 个模块 |
-| 🟢 低 | PaperService indexTypes 类型不一致（DTO List vs QueryDTO String） | 1 个模块 |
-| 🟢 低 | 用户管理页面仅占位（需阶段四实现） | 1 个页面 |
-| 🟢 低 | 归一化缓存在数据变更后需手动调用 `clearMaxCache()`，尚未集成到 CRUD 操作中 | 1 个模块 |
-| 🟢 低 | ECharts 打包后 chunk 较大（PortraitView.js 1.13MB），可考虑异步加载优化 | 1 个文件 |
+| 🟢 低 | 归一化缓存在数据变更后需手动调用 `clearMaxCache()`，尚未集成到 CRUD | 1 个模块 |
+| 🟢 低 | ECharts 打包 chunk 较大 (PortraitView 1.13MB)，可异步加载优化 | 1 个文件 |
+| 🟢 低 | Knife4j OpenAPI3 模式无 /swagger-ui.html，仅 /doc.html 可用 | 文档入口 |
+| 🟢 低 | admin 密码使用 MD5 加密，可考虑升级为 BCrypt | 安全 |
