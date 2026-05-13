@@ -41,6 +41,9 @@ public class PatentService {
     @Resource
     private HttpServletRequest request;
 
+    @Resource
+    private ScoreCalculationService scoreCalculationService;
+
     public Page<PatentVO> page(PatentQueryDTO query) {
         LambdaQueryWrapper<Patent> wrapper = buildQueryWrapper(query);
         Page<Patent> page = patentMapper.selectPage(
@@ -80,7 +83,11 @@ public class PatentService {
         return toVO(entity);
     }
 
+    @Transactional
     public PatentVO create(PatentDTO dto) {
+        checkApplicationNoUnique(dto.getApplicationNo(), null);
+        checkGrantNoUnique(dto.getGrantNo(), null);
+
         Patent entity = new Patent();
         BeanUtils.copyProperties(dto, entity);
         if (entity.getIsCounted() == null) {
@@ -88,9 +95,11 @@ public class PatentService {
         }
         entity.setUserId(getCurrentUserId());
         patentMapper.insert(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(entity.getId());
     }
 
+    @Transactional
     public PatentVO update(Long id, PatentDTO dto) {
         Patent entity = patentMapper.selectById(id);
         if (entity == null) {
@@ -99,12 +108,17 @@ public class PatentService {
         if (!entity.getUserId().equals(getCurrentUserId())) {
             throw new BusinessException("无权修改他人数据");
         }
+        checkApplicationNoUnique(dto.getApplicationNo(), id);
+        checkGrantNoUnique(dto.getGrantNo(), id);
+
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
         patentMapper.updateById(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(id);
     }
 
+    @Transactional
     public void delete(Long id) {
         Patent entity = patentMapper.selectById(id);
         if (entity == null) {
@@ -114,6 +128,7 @@ public class PatentService {
             throw new BusinessException("无权删除他人数据");
         }
         patentMapper.deleteById(id);
+        scoreCalculationService.clearMaxCache();
     }
 
     @Transactional
@@ -135,6 +150,8 @@ public class PatentService {
             patent.setIsCounted(dto.getIsCounted());
             patentMapper.updateById(patent);
         }
+
+        scoreCalculationService.clearMaxCache();
 
         PatentTransferVO vo = new PatentTransferVO();
         BeanUtils.copyProperties(transfer, vo);
@@ -195,6 +212,36 @@ public class PatentService {
 
     private String getCurrentUserRole() {
         return (String) request.getAttribute("role");
+    }
+
+    private void checkApplicationNoUnique(String applicationNo, Long excludeId) {
+        if (applicationNo == null || applicationNo.isEmpty()) {
+            return;
+        }
+        LambdaQueryWrapper<Patent> wrapper = new LambdaQueryWrapper<Patent>()
+                .eq(Patent::getApplicationNo, applicationNo);
+        if (excludeId != null) {
+            wrapper.ne(Patent::getId, excludeId);
+        }
+        Long count = patentMapper.selectCount(wrapper);
+        if (count > 0) {
+            throw new BusinessException("专利申请号已存在");
+        }
+    }
+
+    private void checkGrantNoUnique(String grantNo, Long excludeId) {
+        if (grantNo == null || grantNo.isEmpty()) {
+            return;
+        }
+        LambdaQueryWrapper<Patent> wrapper = new LambdaQueryWrapper<Patent>()
+                .eq(Patent::getGrantNo, grantNo);
+        if (excludeId != null) {
+            wrapper.ne(Patent::getId, excludeId);
+        }
+        Long count = patentMapper.selectCount(wrapper);
+        if (count > 0) {
+            throw new BusinessException("专利授权号已存在");
+        }
     }
 
     private Long getCurrentUserId() {

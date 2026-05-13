@@ -12,6 +12,7 @@ import com.portrait.mapper.UserMapper;
 import com.portrait.vo.CompetitionVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +33,9 @@ public class CompetitionService {
 
     @Resource
     private HttpServletRequest request;
+
+    @Resource
+    private ScoreCalculationService scoreCalculationService;
 
     public Page<CompetitionVO> page(CompetitionQueryDTO query) {
         LambdaQueryWrapper<Competition> wrapper = buildQueryWrapper(query);
@@ -72,7 +76,10 @@ public class CompetitionService {
         return toVO(entity);
     }
 
+    @Transactional
     public CompetitionVO create(CompetitionDTO dto) {
+        checkCertificateNoUnique(dto.getCertificateNo(), null);
+
         Competition entity = new Competition();
         BeanUtils.copyProperties(dto, entity);
         if (entity.getGuideRank() == null) {
@@ -80,9 +87,11 @@ public class CompetitionService {
         }
         entity.setUserId(getCurrentUserId());
         competitionMapper.insert(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(entity.getId());
     }
 
+    @Transactional
     public CompetitionVO update(Long id, CompetitionDTO dto) {
         Competition entity = competitionMapper.selectById(id);
         if (entity == null) {
@@ -91,12 +100,16 @@ public class CompetitionService {
         if (!entity.getUserId().equals(getCurrentUserId())) {
             throw new BusinessException("无权修改他人数据");
         }
+        checkCertificateNoUnique(dto.getCertificateNo(), id);
+
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
         competitionMapper.updateById(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(id);
     }
 
+    @Transactional
     public void delete(Long id) {
         Competition entity = competitionMapper.selectById(id);
         if (entity == null) {
@@ -106,6 +119,7 @@ public class CompetitionService {
             throw new BusinessException("无权删除他人数据");
         }
         competitionMapper.deleteById(id);
+        scoreCalculationService.clearMaxCache();
     }
 
     private CompetitionVO toVO(Competition entity) {
@@ -150,6 +164,21 @@ public class CompetitionService {
 
     private String getCurrentUserRole() {
         return (String) request.getAttribute("role");
+    }
+
+    private void checkCertificateNoUnique(String certificateNo, Long excludeId) {
+        if (certificateNo == null || certificateNo.isEmpty()) {
+            return;
+        }
+        LambdaQueryWrapper<Competition> wrapper = new LambdaQueryWrapper<Competition>()
+                .eq(Competition::getCertificateNo, certificateNo);
+        if (excludeId != null) {
+            wrapper.ne(Competition::getId, excludeId);
+        }
+        Long count = competitionMapper.selectCount(wrapper);
+        if (count > 0) {
+            throw new BusinessException("证书编号已存在");
+        }
     }
 
     private Long getCurrentUserId() {

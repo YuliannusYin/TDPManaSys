@@ -12,6 +12,7 @@ import com.portrait.mapper.UserMapper;
 import com.portrait.vo.SoftwareCopyrightVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +33,9 @@ public class SoftwareCopyrightService {
 
     @Resource
     private HttpServletRequest request;
+
+    @Resource
+    private ScoreCalculationService scoreCalculationService;
 
     public Page<SoftwareCopyrightVO> page(SoftwareCopyrightQueryDTO query) {
         LambdaQueryWrapper<SoftwareCopyright> wrapper = buildQueryWrapper(query);
@@ -72,6 +76,7 @@ public class SoftwareCopyrightService {
         return toVO(entity);
     }
 
+    @Transactional
     public SoftwareCopyrightVO create(SoftwareCopyrightDTO dto) {
         checkRegistrationNoUnique(dto.getRegistrationNo(), null);
 
@@ -79,9 +84,11 @@ public class SoftwareCopyrightService {
         BeanUtils.copyProperties(dto, entity);
         entity.setUserId(getCurrentUserId());
         softwareCopyrightMapper.insert(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(entity.getId());
     }
 
+    @Transactional
     public SoftwareCopyrightVO update(Long id, SoftwareCopyrightDTO dto) {
         SoftwareCopyright entity = softwareCopyrightMapper.selectById(id);
         if (entity == null) {
@@ -96,9 +103,11 @@ public class SoftwareCopyrightService {
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
         softwareCopyrightMapper.updateById(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(id);
     }
 
+    @Transactional
     public void delete(Long id) {
         SoftwareCopyright entity = softwareCopyrightMapper.selectById(id);
         if (entity == null) {
@@ -108,6 +117,7 @@ public class SoftwareCopyrightService {
             throw new BusinessException("无权删除他人数据");
         }
         softwareCopyrightMapper.deleteById(id);
+        scoreCalculationService.clearMaxCache();
     }
 
     private void checkRegistrationNoUnique(String registrationNo, Long excludeId) {

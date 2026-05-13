@@ -12,6 +12,7 @@ import com.portrait.mapper.VerticalProjectMapper;
 import com.portrait.vo.VerticalProjectVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +33,9 @@ public class VerticalProjectService {
 
     @Resource
     private HttpServletRequest request;
+
+    @Resource
+    private ScoreCalculationService scoreCalculationService;
 
     public Page<VerticalProjectVO> page(VerticalProjectQueryDTO query) {
         LambdaQueryWrapper<VerticalProject> wrapper = buildQueryWrapper(query);
@@ -79,6 +83,7 @@ public class VerticalProjectService {
         return vo;
     }
 
+    @Transactional
     public VerticalProjectVO create(VerticalProjectDTO dto) {
         VerticalProject entity = new VerticalProject();
         BeanUtils.copyProperties(dto, entity);
@@ -93,9 +98,11 @@ public class VerticalProjectService {
         }
 
         verticalProjectMapper.insert(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(entity.getId());
     }
 
+    @Transactional
     public VerticalProjectVO update(Long id, VerticalProjectDTO dto) {
         VerticalProject entity = verticalProjectMapper.selectById(id);
         if (entity == null) {
@@ -119,9 +126,11 @@ public class VerticalProjectService {
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
         verticalProjectMapper.updateById(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(id);
     }
 
+    @Transactional
     public void delete(Long id) {
         VerticalProject entity = verticalProjectMapper.selectById(id);
         if (entity == null) {
@@ -131,6 +140,7 @@ public class VerticalProjectService {
             throw new BusinessException("无权删除他人数据");
         }
         verticalProjectMapper.deleteById(id);
+        scoreCalculationService.clearMaxCache();
     }
 
     private LambdaQueryWrapper<VerticalProject> buildQueryWrapper(VerticalProjectQueryDTO query) {

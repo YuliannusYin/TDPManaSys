@@ -37,6 +37,9 @@ public class PaperService {
     @Resource
     private HttpServletRequest request;
 
+    @Resource
+    private ScoreCalculationService scoreCalculationService;
+
     public Page<PaperVO> page(PaperQueryDTO query) {
         LambdaQueryWrapper<Paper> wrapper = buildQueryWrapper(query);
 
@@ -111,12 +114,15 @@ public class PaperService {
 
     @Transactional
     public PaperVO create(PaperDTO dto) {
+        checkDoiUnique(dto.getDoi(), null);
+
         Paper entity = new Paper();
         BeanUtils.copyProperties(dto, entity);
         entity.setUserId(getCurrentUserId());
         paperMapper.insert(entity);
 
         saveIndexTypes(entity.getId(), dto.getIndexTypes());
+        scoreCalculationService.clearMaxCache();
         return getById(entity.getId());
     }
 
@@ -129,12 +135,15 @@ public class PaperService {
         if (!entity.getUserId().equals(getCurrentUserId())) {
             throw new BusinessException("无权修改他人数据");
         }
+        checkDoiUnique(dto.getDoi(), id);
+
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
         paperMapper.updateById(entity);
 
         paperIndexMapper.delete(new LambdaQueryWrapper<PaperIndex>().eq(PaperIndex::getPaperId, id));
         saveIndexTypes(id, dto.getIndexTypes());
+        scoreCalculationService.clearMaxCache();
         return getById(id);
     }
 
@@ -149,6 +158,7 @@ public class PaperService {
         }
         paperIndexMapper.delete(new LambdaQueryWrapper<PaperIndex>().eq(PaperIndex::getPaperId, id));
         paperMapper.deleteById(id);
+        scoreCalculationService.clearMaxCache();
     }
 
     private void saveIndexTypes(Long paperId, List<String> indexTypes) {
@@ -159,9 +169,7 @@ public class PaperService {
                 pi.setIndexType(type);
                 return pi;
             }).collect(Collectors.toList());
-            for (PaperIndex pi : list) {
-                paperIndexMapper.insert(pi);
-            }
+            paperIndexMapper.insert(list);
         }
     }
 
@@ -209,6 +217,21 @@ public class PaperService {
 
     private String getCurrentUserRole() {
         return (String) request.getAttribute("role");
+    }
+
+    private void checkDoiUnique(String doi, Long excludeId) {
+        if (doi == null || doi.isEmpty()) {
+            return;
+        }
+        LambdaQueryWrapper<Paper> wrapper = new LambdaQueryWrapper<Paper>()
+                .eq(Paper::getDoi, doi);
+        if (excludeId != null) {
+            wrapper.ne(Paper::getId, excludeId);
+        }
+        Long count = paperMapper.selectCount(wrapper);
+        if (count > 0) {
+            throw new BusinessException("DOI已存在");
+        }
     }
 
     private Long getCurrentUserId() {
