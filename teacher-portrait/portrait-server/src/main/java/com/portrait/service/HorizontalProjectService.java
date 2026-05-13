@@ -12,6 +12,7 @@ import com.portrait.mapper.UserMapper;
 import com.portrait.vo.HorizontalProjectVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +33,9 @@ public class HorizontalProjectService {
 
     @Resource
     private HttpServletRequest request;
+
+    @Resource
+    private ScoreCalculationService scoreCalculationService;
 
     public Page<HorizontalProjectVO> page(HorizontalProjectQueryDTO query) {
         LambdaQueryWrapper<HorizontalProject> wrapper = buildQueryWrapper(query);
@@ -79,6 +83,7 @@ public class HorizontalProjectService {
         return vo;
     }
 
+    @Transactional
     public HorizontalProjectVO create(HorizontalProjectDTO dto) {
         if (dto.getContractAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
             throw new BusinessException("合同金额必须大于0");
@@ -88,9 +93,11 @@ public class HorizontalProjectService {
         BeanUtils.copyProperties(dto, entity);
         entity.setUserId(getCurrentUserId());
         horizontalProjectMapper.insert(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(entity.getId());
     }
 
+    @Transactional
     public HorizontalProjectVO update(Long id, HorizontalProjectDTO dto) {
         HorizontalProject entity = horizontalProjectMapper.selectById(id);
         if (entity == null) {
@@ -107,9 +114,11 @@ public class HorizontalProjectService {
         BeanUtils.copyProperties(dto, entity);
         entity.setId(id);
         horizontalProjectMapper.updateById(entity);
+        scoreCalculationService.clearMaxCache();
         return getById(id);
     }
 
+    @Transactional
     public void delete(Long id) {
         HorizontalProject entity = horizontalProjectMapper.selectById(id);
         if (entity == null) {
@@ -119,6 +128,7 @@ public class HorizontalProjectService {
             throw new BusinessException("无权删除他人数据");
         }
         horizontalProjectMapper.deleteById(id);
+        scoreCalculationService.clearMaxCache();
     }
 
     private LambdaQueryWrapper<HorizontalProject> buildQueryWrapper(HorizontalProjectQueryDTO query) {

@@ -297,6 +297,49 @@
 
 ***
 
+## 2026-05-13 — 技术债务偿还
+
+### 🟡 高：唯一性校验补充
+
+- ✅ **专利(Patent)**：新增 `checkApplicationNoUnique()` + `checkGrantNoUnique()` 唯一性校验（新增+编辑查重，排除自身）
+- ✅ **论文(Paper)**：新增 `checkDoiUnique()` DOI 唯一性校验
+- ✅ **竞赛(Competition)**：新增 `checkCertificateNoUnique()` 证书编号唯一性校验
+- ⚠️ **横向项目(HorizontalProject)**：无天然唯一标识字段，跳过唯一性校验
+
+### 🟢 低：@Transactional 事务补充
+
+- ✅ VerticalProjectService：create/update/delete 全部添加 `@Transactional`
+- ✅ HorizontalProjectService：create/update/delete 全部添加 `@Transactional`
+- ✅ SoftwareCopyrightService：create/update/delete 全部添加 `@Transactional`
+- ✅ CompetitionService：create/update/delete 全部添加 `@Transactional`
+- ✅ PatentService：create/update/delete 全部添加 `@Transactional`（transfer 已有）
+
+### 🟢 低：PaperService 批量插入优化
+
+- ✅ `saveIndexTypes()` 由逐条 for-loop insert 改为 `paperIndexMapper.insert(list)` 批量插入
+
+### 🟢 低：归一化缓存集成
+
+- ✅ 所有 6 个 CRUD Service 注入 `ScoreCalculationService`
+- ✅ create/update/delete 操作后自动调用 `clearMaxCache()`，无需手动刷新缓存
+- ✅ PatentService.transfer() 也集成了缓存清除
+
+### 🟢 低：ECharts 打包优化
+
+- ✅ vite.config.js 添加 `manualChunks: { echarts: ['echarts'] }` 将 ECharts 拆分为独立 chunk
+- ✅ PortraitView chunk 从 **1.13MB → 11.51kB**（减少 99%），ECharts 独立为 1,123kB 可缓存复用
+
+### 🟢 低：Knife4j /swagger-ui.html 问题
+
+- ⚠️ 维持现状 — Knife4j OpenAPI3 模式仅支持 `/doc.html`，此为框架行为无法修复
+
+### 验证
+
+- ✅ 后端编译：6 文件修改后 BUILD SUCCESS
+- ✅ 前端构建：2282 modules built，ECharts 独立 chunk 生效
+
+***
+
 ## 当前项目状态
 
 ### 已完成
@@ -310,6 +353,7 @@
 |  阶段四 | 系统管理与配置（用户管理/权重配置）         |  ✅  |
 |  阶段五 | Excel 导入导出                 |  ✅  |
 |  阶段六 | 全流程测试与优化（58 用例 100% 通过）    |  ✅  |
+|  技术债务偿还 | 6 项技术债务修复（5 完成 + 1 无法修复）   |  ✅  |
 
 ### 源码规模
 
@@ -328,10 +372,5 @@
 
 |  优先级 | 问题                                                            | 影响范围  |
 | :--: | ------------------------------------------------------------- | ----- |
-| 🟡 高 | 横向项目/专利(申请号/授权号)/论文(DOI)/竞赛(证书编号)缺少唯一性校验                      | 5 个模块 |
-| 🟢 低 | Vertical/Horizontal/Software/Competition 写操作缺少 @Transactional | 4 个模块 |
-| 🟢 低 | PaperService 索引标签逐条 insert，应改为批量插入                            | 1 个模块 |
-| 🟢 低 | 归一化缓存在数据变更后需手动调用 `clearMaxCache()`，尚未集成到 CRUD                 | 1 个模块 |
-| 🟢 低 | ECharts 打包 chunk 较大 (PortraitView 1.13MB)，可异步加载优化             | 1 个文件 |
 | 🟢 低 | Knife4j OpenAPI3 模式无 /swagger-ui.html，仅 /doc.html 可用          | 文档入口  |
 
