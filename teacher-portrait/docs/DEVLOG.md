@@ -124,6 +124,103 @@
 
 ---
 
+## 2026-05-13 — 阶段三：数字画像与可视化
+
+### 后端评分计算引擎 (ScoreCalculationService)
+- ✅ 创建 ScoreCalculationService（75 行 × 5 维度计分引擎）
+- ✅ `calcProjectScore()` — 纵向项目四级阶梯（主持 20/15/10/5 + 参与折半）+ 横向项目按合同金额每 10 万 +2 分
+- ✅ `calcPatentScore()` — 发明/实用新型/外观三档（已授权 20/10/5 + 申请中减半）+ 转让额外 +5/项
+- ✅ `calcSoftwareScore()` — 已登记 +10/项
+- ✅ `calcPaperScore()` — A/B/C/D 四档（25/15/10/5）+ 非第一作者权重 0.5 + 论文等级从收录标签映射（SCI/SSCI→A 类, EI/CSCD→B 类, CSSCI/北大核心→C 类, 其他→D 类）
+- ✅ `calcCompetitionScore()` — 国/省/校三级五档梯次（国特30→校三3）+ 非第一指导×0.7
+- ✅ `calculateRadar()` — 返回 5 维原始分 + 归一化分 + 教师基本信息
+- ✅ `calculateDashboard()` — 返回经费总额、A/B 类论文数、已授权专利数、软著数、竞赛获奖数、原始分、归一化分
+- ✅ `calculateTrend()` — 近 5 年逐年统计（项目数+经费、专利数、软著数、论文数、竞赛数）
+- ✅ `calculateDistribution()` — 四类饼图数据（项目级别分布、专利类型分布、论文等级分布、竞赛级别分布）
+- ✅ `compareRadars()` — 多教师对比雷达图（取全局最高分归一化）
+- ⚠️ 遇到问题：`int` 接收 `selectCount()` 返回值 → 编译错误 → 改为 `long`
+- ⚠️ 遇到问题：论文等级映射需取最高收录优先级（如多收录取最高级）→ `loadPaperClasses()` 按优先级合并
+
+### 后端 PortraitController
+- ✅ 创建 PortraitController — 6 个接口
+- ✅ GET `/api/portrait/{userId}/radar` — 权限：TEACHER 仅本人
+- ✅ GET `/api/portrait/{userId}/dashboard` — 权限：TEACHER 仅本人
+- ✅ GET `/api/portrait/{userId}/trend` — 权限：TEACHER 仅本人
+- ✅ GET `/api/portrait/{userId}/distribution` — 权限：TEACHER 仅本人
+- ✅ GET `/api/portrait/compare?userIds=1,2` — **仅 ADMIN** 可调用，参数校验 2-5 人
+- ✅ GET `/api/portrait/teachers` — 返回全院教师列表（下拉选择器数据源）
+- ⚠️ 遇到问题：`checkAccess()` 中默认抛 `BusinessException("无权查看他人数据")` code=500 → 改为 code=403
+
+### 前端数字画像页面
+- ✅ 安装 ECharts 5（`npm install echarts --save`）
+- ✅ 创建 portrait.js API 模块（6 个接口封装）
+- ✅ 创建 PortraitView.vue — 画像主页面
+  - 顶部 6 张概览卡片（经费、A/B 类论文、专利、软著、竞赛、综合均分），综合均分 <30 红 / 30-60 黄 / ≥60 绿
+  - 管理员：下拉选择器切换全院教师；普通教师：默认本人
+  - 支持路由参数 `/portrait/:userId?` 直接定位
+- ✅ 创建 RadarChart.vue — ECharts 雷达图
+  - 5 维指标：科研项目/专利成果/软件著作/学术论文/竞赛指导
+  - 原始得分 / 归一化得分开关切换
+  - 管理员对比模式：多选 2-5 人叠加展示（不同颜色线条）
+- ✅ 创建 TrendChart.vue — ECharts 柱状图 + 折线图
+  - 5 模块 Tab 切换（项目/专利/软著/论文/竞赛）
+  - 项目模块额外渲染经费折线（双 Y 轴）
+  - X 轴：年份（近 5 年），Y 轴：数量
+- ✅ 创建 DistributionChart.vue — ECharts 环形饼图
+  - 4 类分布切换：项目级别 / 专利类型 / 论文类别 / 竞赛级别
+  - 数据通过 `/api/portrait/{userId}/distribution` 动态获取
+
+### 测试验证
+- ✅ 插入 T001(张教授) 和 T002(李教授) 差异化测试数据（各模块数量不同）
+- ✅ Radar 手动计分验证：T001 科研项目=45.00(国主20+省主15+市参与5+校主5)、专利=25.00、软著=20.00、论文=37.50(SCI一作25+EI二作7.5+普通5)、竞赛=35.00(国一25+省二10) — **全部命中**
+- ✅ Dashboard 汇总验证：经费125万、A类1篇、B类1篇、已授权1、软著2、竞赛2 — **全部命中**
+- ✅ Compare 对比验证：T001/T002 归一化合理（T001 软著低于 T002，对比归一化 66.7% / 100.0%）
+- ✅ Trend 趋势验证：逐年数据（2022-2026）与测试数据完全匹配
+- ✅ Distribution 分布验证：4 类饼图数据正确
+- ✅ 归一化边界验证：所有归一化值均在 [0, 100] 区间内
+- ✅ 权限验证：T001 查自己 → 200；T001 查 T002 → 403；T001 调用 compare → 403
+- ✅ 后端编译：75 源文件 BUILD SUCCESS
+- ✅ 前端构建：2282 modules built（含 ECharts）
+
+### Issue 发现与修复
+- ❌ Issue1：distribution 接口缺失 `checkAccess()` → ✅ 添加权限校验
+- ❌ Issue2：`normalizeScores()` 每次全表扫描全量计算 → ✅ 新增 `volatile cachedGlobalMaxes` + DCL 缓存 + `clearMaxCache()` 刷新接口
+- ❌ Issue3：PortraitView 给 DistributionChart 传入空对象 `{}` → ✅ 移除冗余 prop（组件已自行调用 API）
+- ❌ Issue4：RadarChart 获取对比数据后未 emit 到父组件 → ✅ 新增 `emit('update:compareData')` + 父组件 `onCompareData()` 更新状态
+
+---
+
+## 当前项目状态
+
+### 已完成
+
+| 阶段 | 内容 | 状态 |
+|:----:|------|:----:|
+| 阶段一 | 项目初始化 + 登录认证 + 路由守卫 + 权限拦截 | ✅ |
+| 阶段二 | 6 个成果管理模块完整 CRUD | ✅ |
+| 安全修复 | 3 个跨用户操作漏洞修复 | ✅ |
+| 阶段三 | 数字画像与可视化（5 接口 + 4 图表组件） | ✅ |
+
+### 源码规模
+
+| 指标 | 数量 |
+|------|:--:|
+| 后端 Java 源文件 | 75 |
+| 前端 Vue/JS 文件 | 25 |
+| REST API 接口 | 37 + 2 |
+| 数据库表 | 10 |
+| 前端 Chart 组件 | 4（Radar/Trend/Distribution + PortraitView） |
+
+### 待开发
+
+| 阶段 | 内容 | 计划 |
+|:----:|------|:----:|
+| 阶段四 | 系统管理与配置（用户管理/权重配置） | 计划书 1 天 |
+| 阶段五 | Excel 导入导出（模板下载/批量导入/数据导出） | 计划书 1 天 |
+| 阶段六 | 测试与优化（功能测试/权限测试/性能优化） | 计划书 1 天 |
+
+---
+
 ## 已知技术债务
 
 | 优先级 | 问题 | 影响范围 |
@@ -133,4 +230,5 @@
 | 🟢 低 | PaperService 索引标签逐条 insert，应改为批量插入 | 1 个模块 |
 | 🟢 低 | PaperService indexTypes 类型不一致（DTO List vs QueryDTO String） | 1 个模块 |
 | 🟢 低 | 用户管理页面仅占位（需阶段四实现） | 1 个页面 |
-| 🟢 低 | 后端正则清理占位测试数据 | 所有模块 |
+| 🟢 低 | 归一化缓存在数据变更后需手动调用 `clearMaxCache()`，尚未集成到 CRUD 操作中 | 1 个模块 |
+| 🟢 低 | ECharts 打包后 chunk 较大（PortraitView.js 1.13MB），可考虑异步加载优化 | 1 个文件 |
