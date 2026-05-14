@@ -7,7 +7,9 @@ import java.util.Map;
 
 @Data
 public class PortraitDashboardVO {
+    private Long projectTotalCount;
     private BigDecimal totalFunding;
+    private Long paperTotalCount;
     private Long paperACount;
     private Long paperBCount;
     private Long patentGrantedCount;

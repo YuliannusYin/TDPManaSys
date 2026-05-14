@@ -11,6 +11,7 @@
             <div class="stat-info">
               <p class="stat-label">{{ card.label }}</p>
               <p class="stat-value">{{ card.value }}</p>
+              <p v-if="card.sub" class="stat-sub">{{ card.sub }}</p>
             </div>
           </div>
         </el-card>
@@ -45,24 +46,48 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../store/user'
-import { Document, Collection, TrophyBase, DataBoard } from '@element-plus/icons-vue'
+import { getPortraitDashboard, getAggregatedDashboard } from '../../api/portrait'
+import { Document, Collection, TrophyBase, DataBoard, Money, Files } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+const dashboard = ref({})
 
 const portraitPath = computed(() => {
   return userStore.userInfo ? `/portrait/${userStore.userInfo.userId}` : '/portrait'
 })
 
-const cards = [
-  { label: '纵向项目', value: '-', icon: Document, bg: '#409EFF' },
-  { label: '横向项目', value: '-', icon: Collection, bg: '#67C23A' },
-  { label: '专利成果', value: '-', icon: TrophyBase, bg: '#E6A23C' },
-  { label: '学术论文', value: '-', icon: DataBoard, bg: '#F56C6C' }
-]
+function fmtMoney(v) { return v ? Number(v).toFixed(1) : '0.0' }
+
+const cards = computed(() => {
+  const d = dashboard.value
+  return [
+    { label: '项目总数', value: d.projectTotalCount ?? '-', icon: Document, bg: '#409EFF' },
+    { label: '项目总经费(万)', value: fmtMoney(d.totalFunding), icon: Money, bg: '#409EFF' },
+    { label: '已授权专利', value: d.patentGrantedCount ?? '-', icon: TrophyBase, bg: '#E6A23C' },
+    { label: '软件著作', value: d.softwareCount ?? '-', icon: Files, bg: '#909399' },
+    { label: '学术论文', value: d.paperTotalCount ?? '-', sub: d.paperACount != null ? `A类 ${d.paperACount} / B类 ${d.paperBCount}` : '', icon: DataBoard, bg: '#F56C6C' },
+    { label: '竞赛获奖', value: d.competitionAwardCount ?? '-', icon: Collection, bg: '#67C23A' }
+  ]
+})
+
+onMounted(async () => {
+  try {
+    let res
+    if (userStore.role === 'ADMIN') {
+      res = await getAggregatedDashboard()
+    } else if (userStore.userInfo?.userId) {
+      res = await getPortraitDashboard(userStore.userInfo.userId)
+    }
+    if (res && res.code === 200) {
+      dashboard.value = res.data
+    }
+  } catch { /* ignore */ }
+})
 </script>
 
 <style scoped>
@@ -94,9 +119,11 @@ const cards = [
   align-items: center;
   justify-content: center;
   color: #fff;
+  flex-shrink: 0;
 }
 .stat-info {
   flex: 1;
+  min-width: 0;
 }
 .stat-label {
   font-size: 14px;
@@ -107,5 +134,10 @@ const cards = [
   font-size: 24px;
   font-weight: bold;
   color: #303133;
+}
+.stat-sub {
+  font-size: 12px;
+  color: #C0C4CC;
+  margin-top: 2px;
 }
 </style>

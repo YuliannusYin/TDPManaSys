@@ -35,7 +35,7 @@ function buildOption() {
     name: '数量', type: 'bar', data: vals,
     itemStyle: { color: '#5470C6', borderRadius: [4, 4, 0, 0] }
   }]
-  const yAxes = [{ type: 'value', name: '数量' }]
+  const yAxes = [{ type: 'value', name: '数量', minInterval: 1 }]
 
   if (activeTab.value === 'project') {
     const funds = props.trendData.map(d => Number(d.projectFunding || 0))
