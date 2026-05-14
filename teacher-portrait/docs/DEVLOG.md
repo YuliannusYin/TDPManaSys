@@ -368,6 +368,105 @@
 
 ***
 
+## 2026-05-14 — Bug 修复与性能优化
+
+### Bug 1：首页仪表盘数据汇总卡片无数据
+
+- ❌ 根因：DashboardView.vue 中 6 张统计卡片均为硬编码 `'-'`，无 API 调用和数据绑定
+- ❌ 根因：后端 `PortraitDashboardVO` 缺少 `projectTotalCount` 和 `paperTotalCount` 字段
+- ❌ 根因：管理员无聚合仪表盘端点，只能查看单用户仪表盘
+- ✅ 后端：`PortraitDashboardVO` 新增 `projectTotalCount`、`paperTotalCount` 字段
+- ✅ 后端：`calculateDashboard()` 补充项目总数、论文总数计算逻辑
+- ✅ 后端：新增 `GET /api/portrait/dashboard` 聚合端点（仅 ADMIN），调用 `calculateAggregatedDashboard()`
+- ✅ 后端：`calculateAggregatedDashboard()` 遍历全用户汇总全院项目/经费/论文/专利/软著/竞赛数据
+- ✅ 前端：`portrait.js` 新增 `getAggregatedDashboard()` API 封装
+- ✅ 前端：`DashboardView.vue` 完全重写 — `onMounted` 调用 API，6 张卡片绑定真实数据（项目总数、经费、已授权专利、软著、论文 A/B 类、竞赛获奖）
+- ✅ 前端：管理员调用聚合接口，普通教师调用单用户接口
+
+### Bug 2A：雷达图分数超过 100（爆表）
+
+- ❌ 根因：`normalizeScores()` 使用 DCL 缓存 `getGlobalMaxes()`，新增数据后缓存过期，`raw * 100 / stale_max` 可能 > 100
+- ✅ 保留 DCL 缓存机制（避免每次全量重算）
+- ✅ `normalizeScores()` 新增安全帽上限 `min(normalized, 100)`
+- ✅ `compareRadars()` 内联归一化同步加上 ≤100 上限
+- ✅ `clearMaxCache()` 从空方法改为 `cachedGlobalMaxes = null`（volatile 保证多线程可见性）
+
+### Bug 2B：柱状图/趋势图 Y 轴出现小数刻度
+
+- ❌ 根因：TrendChart.vue 数量类 Y 轴未设置 `minInterval` → ECharts 自动计算产生 0、0.2、0.4 等刻度
+- ✅ 数量轴：`{ type: 'value', name: '数量', minInterval: 1 }` — 强制整数刻度
+- ✅ 经费轴（双 Y 轴右侧）：保留小数刻度不变
+
+### 性能优化：方案 C — DataLoader 全面重构
+
+#### 问题诊断
+
+`calculateDashboard(userId)` 和 `calculateRawScores(userId)` 各自独立查询 5 张相同表，**单用户 ≈ 13 次 DB 查询**（含 N 条专利的 transfer 子查询）。`calculateAggregatedDashboard()` 对 M 个用户循环调用 → **M×13 次**。
+
+#### 重构方案
+
+采用用户选择的方案 C — 新增 `AllUserData` 内部类 + `loadAllData()` 批量加载器：
+
+```
+Public API（calculateDashboard / calculateRadar / calculateAggregatedDashboard / compareRadars）
+    └── loadAllData() ──→ 8 DB queries (once, selectList(null) 全表)
+             │
+             ▼
+        AllUserData (内存索引：8 张表按 userId 分组)
+             │
+             ▼
+        buildRawScores / buildDashboard / calc*Score ──→ 纯内存，0 DB
+```
+
+- ✅ 新增 `AllUserData` 内部类（8 个 `Map<Long, List<>>` + `paperClass` 预计算 + `transferCountByPatent` 预聚合）
+- ✅ 新增 `loadAllData()`：`selectList(null)` 全表查出 8 张表，按 userId 分组索引，论文级别和转让次数在加载时一次预计算
+- ✅ `buildRawScores(userId, AllUserData d)`：纯内存计算 5 维分数，替代旧 `calculateRawScores(userId)`
+- ✅ `buildDashboard(userId, AllUserData d)`：纯内存计算仪表盘统计 + 归一化
+- ✅ `buildGlobalMaxes(AllUserData d)`：纯内存计算全局最大值
+- ✅ `ensureCache(AllUserData d)`：若缓存为空则从 loaded data 构建，避免 getGlobalMaxes 内部的二次 DB 加载
+- ✅ `calculateDashboard(userId)` → `loadAllData()` + `buildDashboard(userId, d)`
+- ✅ `calculateAggregatedDashboard()` → `loadAllData()` 一次 + 内存循环聚合（不再调 `buildDashboard`）
+- ✅ `calculateRadar(userId)` → `loadAllData()` + `buildRawScores(userId, d)`
+- ✅ `compareRadars(userIds)` → `loadAllData()` 一次 + 内存计算所有用户雷达图
+- ✅ `getGlobalMaxes()` DCL 缓存命中时 0 DB，miss 时调 `loadAllData()` 一次
+
+#### 性能提升
+
+| 接口 | 重构前（10 教师） | 重构后 |
+|---|---|---|
+| `calculateDashboard` | ~13 次 DB | **8 次**（一次 loadAllData） |
+| `calculateAggregatedDashboard` | ~130 次 DB | **8 次**（一次 loadAllData） |
+| `calculateRadar` | ~9 次 DB | **8 次**（一次 loadAllData） |
+| `compareRadars`(3人) | ~27 次 DB | **8 次**（一次 loadAllData） |
+| `getGlobalMaxes`(首次) | ~M×5 次 DB | **8 次**（一次 loadAllData） |
+
+### Issue 修复（性能相关）
+
+- ❌ Issue1：`calculateAggregatedDashboard` 调用 `buildDashboard()` → 内部触发每人一次 `normalizeScores()` 浪费
+- ✅ 改为分两阶段：Phase 1 一次性预计算所有 `buildRawScores()` → Phase 2 直接从 `AllUserData` 列表统计数量和经费
+- ❌ Issue2：移除 DCL 缓存导致每次 `normalizeScores` 全量重算
+- ✅ 恢复 `volatile cachedGlobalMaxes` + DCL + `getGlobalMaxes()` 标准缓存模式
+- ❌ Issue3：`clearMaxCache()` 空方法无法清除缓存
+- ✅ 实现 `cachedGlobalMaxes = null`，volatile 保证多线程可见性
+
+### 验证
+
+- ✅ 后端编译：ScoreCalculationService 全面重构后无编译错误
+- ✅ DashboardView.vue API 调用路径完整（管理员聚合 + 教师单用户）
+- ✅ TrendChart.vue Y 轴 `minInterval: 1` 生效
+- ✅ 归一化 ≤100 cap + DCL 缓存 + 数据变更时 `clearMaxCache()` 完整性
+
+***
+
+## 项目收尾
+
+### 2026-05-14 — 文档更新
+
+- ✅ 更新 DEVLOG.md — 补充 Bug 修复 + 性能优化完整记录
+- ✅ 更新 README.md — 补充已知限制与后续优化建议章节
+
+***
+
 ## 已知技术债务
 
 |  优先级 | 问题                                                            | 影响范围  |
