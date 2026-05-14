@@ -50,6 +50,22 @@ npm install
 npm run dev
 ```
 
+### 导入测试数据（Docker）
+
+> 导入 5 位教师的完整成果数据（纵向项目 44 条、横向项目 50 条、专利 34 条、软著 39 条、论文 49 条、竞赛 58 条），用于数字画像功能测试和演示。
+
+```bash
+cd teacher-portrait
+
+# 1. 将 SQL 文件复制到容器内
+docker cp portrait-server/src/main/resources/db/test-data.sql teacher-portrait-mysql:/tmp/test-data.sql
+
+# 2. 在容器内执行导入（已内置清理逻辑，可重复执行）
+docker exec teacher-portrait-mysql sh -c "mysql -uroot -proot < /tmp/test-data.sql"
+```
+
+> 导入后可用 T101~T105 工号登录（密码 `123456`），各教师数据量差异明显，适合测试雷达图对比和趋势图展示效果。
+
 ### 手动启动
 
 ```bash

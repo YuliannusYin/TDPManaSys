@@ -15,8 +15,6 @@
         </el-form-item>
       </el-form>
       <div class="login-tips">
-        <p>默认管理员: admin / 123456</p>
-        <p>默认教师: T001 / 123456</p>
       </div>
     </div>
   </div>
