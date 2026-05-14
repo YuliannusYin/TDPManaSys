@@ -152,13 +152,39 @@ cd portrait-web && npm install && npm run dev
 
 ---
 
-## 已知问题与待优化项
+## 已知限制与后续优化建议
 
-| 优先级 | 问题 | 影响范围 |
+### 已修复的历史债务（阶段二审计 + 技术债务偿还）
+
+| 问题 | 修复日期 |
+|------|:--:|
+| 6 模块 update 强制覆盖 userId + delete/getById 无所有权校验 | 2026-05-12 |
+| 专利(申请号/授权号)/论文(DOI)/竞赛(证书编号)唯一性校验缺失 | 2026-05-13 |
+| Vertical/Horizontal/Software/Competition 写操作缺少 @Transactional | 2026-05-13 |
+| PaperService 索引标签逐条 insert → 批量插入 | 2026-05-13 |
+| 归一化缓存未集成到 CRUD 操作 → 6 模块 create/update/delete 自动清缓存 | 2026-05-13 |
+| ECharts 打包 1.13MB → 独立 chunk 拆分，主模块减至 11.51kB | 2026-05-13 |
+| Dashboard 数据卡片无数据 + 雷达图爆表 + 柱状图小数刻度 | 2026-05-14 |
+| ScoreCalculationService 单用户 ~13 次 DB 查询 → 方案 C 重构为 ~8 次 | 2026-05-14 |
+
+### 当前技术债务
+
+| 优先级 | 问题 | 建议方案 |
 |:--:|------|------|
-| 🟡 高 | 横向项目/专利(申请号/授权号)/论文(DOI)/竞赛(证书编号)缺少唯一性校验 | 5 个模块 |
-| 🟢 低 | Vertical/Horizontal/Software/Competition 写操作缺少 @Transactional | 4 个模块 |
-| 🟢 低 | PaperService 索引标签逐条 insert，应改为批量插入 | 1 个模块 |
-| 🟢 低 | 归一化缓存在数据变更后需手动调用 `clearMaxCache()`，尚未集成到 CRUD 操作中 | 1 个模块 |
-| 🟢 低 | ECharts 打包 chunk 较大 (PortraitView 1.13MB)，可异步加载优化 | 1 个文件 |
-| 🟢 低 | 默认 admin 密码使用 MD5 加密，可考虑升级为 BCrypt | 安全 |
+| 🟡 高 | **无 HTTPS** — 所有数据传输明文，Token 和密码在网络层可被嗅探 | 部署 Nginx 反向代理 + Let's Encrypt 免费 SSL 证书 |
+| 🟡 高 | **无操作日志** — 无法追溯谁在何时修改/删除了哪条数据 | 新增 `sys_operation_log` 表 + AOP 切面自动记录 |
+| 🟡 高 | **无数据备份** — Docker MySQL 数据卷未配置定期备份 | 配置 `cron` 定时 `mysqldump` 或启用 Docker volume backup |
+| 🟡 高 | **MD5 密码** — 弱哈希算法，彩虹表可暴力破解 | 升级为 BCrypt/Argon2（Spring Security 内置支持） |
+| 🟡 高 | **无限流保护** — API 接口无频率限制，可被暴力调用导致服务雪崩 | 引入 Sentinel/Resilience4j 或 Nginx `limit_req` |
+| 🟡 高 | **CORS 全开放** — `allowedOrigins("*")` 生产环境存在 CSRF 风险 | 限定为前端部署域名白名单 |
+| 🟢 低 | **无单元测试** — 仅阶段六手工测试 58 用例，无 JUnit/Vitest 自动化 | 核心 Service 层补齐 JUnit + Mockito |
+| 🟢 低 | **无 CI/CD** — 每次手动 `mvn compile` + `npm run build` | GitHub Actions / Jenkins 流水线 |
+| 🟢 低 | **配置文件硬编码** — 数据库密码、JWT 密钥写在 application.yml | 迁移到环境变量或 Spring Cloud Config |
+| 🟢 低 | **无容器化部署** — 前后端需手动启动，无 Dockerfile/k8s 编排 | 编写 Dockerfile + docker-compose 编排全服务 |
+| 🟢 低 | **ECharts 全量引入** — 即使仅使用雷达/柱状/饼图，仍打包全部图表类型 | 按需 import 或 CDN 外部引入 |
+| 🟢 低 | **无前端错误监控** — 用户端 JS 异常无法感知 | 接入 Sentry/Fundebug |
+| 🟢 低 | **移动端适配缺失** — Element Plus 表格在手机端体验差 | 评估是否需要移动端，如需则适配响应式布局 |
+
+### 已修复完成（无须关注）
+
+以上「当前技术债务」为项目真实待办项。「已修复的历史债务」仅作记录留存。
