@@ -9,6 +9,7 @@ services:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: teacher_portrait
       TZ: Asia/Shanghai
+      JWT_SECRET: ${JWT_SECRET}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci

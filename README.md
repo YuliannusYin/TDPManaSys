@@ -37,14 +37,18 @@
 ```bash
 cd teacher-portrait
 
-# 1. 启动 MySQL 容器（10 张表 + 初始数据自动创建）
+# 1. 启动 MySQL 容器
 docker compose up -d
 
-# 2. 启动后端（端口 8080）
+# 2. 初始化数据库
+docker cp portrait-server/src/main/resources/db/migration/V1__init.sql teacher-portrait-mysql:/tmp/V1__init.sql
+docker exec teacher-portrait-mysql bash -c "mysql -uroot -proot --default-character-set=utf8mb4 < /tmp/V1__init.sql"
+
+# 3. 启动后端（端口 8080）
 cd portrait-server
 ./mvnw.cmd spring-boot:run
 
-# 3. 启动前端（端口 3000）
+# 4. 启动前端（端口 3000）
 cd portrait-web
 npm install
 npm run dev
@@ -61,7 +65,7 @@ cd teacher-portrait
 docker cp portrait-server/src/main/resources/db/test-data.sql teacher-portrait-mysql:/tmp/test-data.sql
 
 # 2. 在容器内执行导入（已内置清理逻辑，可重复执行）
-docker exec teacher-portrait-mysql sh -c "mysql -uroot -proot < /tmp/test-data.sql"
+docker exec teacher-portrait-mysql bash -c "mysql -uroot -proot < /tmp/test-data.sql"
 ```
 
 > 导入后可用 T101~T105 工号登录（密码 `123456`），各教师数据量差异明显，适合测试雷达图对比和趋势图展示效果。

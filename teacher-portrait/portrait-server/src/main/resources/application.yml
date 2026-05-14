@@ -41,5 +41,5 @@ knife4j:
           - com.portrait.controller
 
 jwt:
-  secret: teacher-portrait-secret-key-2026-very-long-secret-key-for-jwt
+  secret: ${JWT_SECRET:teacher-portrait-dev-secret-key-2026}
   expiration: 86400000

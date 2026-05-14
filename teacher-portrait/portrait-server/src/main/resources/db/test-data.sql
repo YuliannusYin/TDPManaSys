@@ -7,7 +7,7 @@ USE `teacher_portrait`;
 -- 教师数字画像系统 - 测试数据脚本
 -- 生成日期: 2026-05-13
 -- 包含 5 位教师的完整成果数据
--- 密码统一为 123456 (MD5)
+-- 密码统一为 123456 (BCrypt)
 -- ============================================================
 
 -- ============================================================
@@ -30,11 +30,11 @@ DELETE FROM `user` WHERE work_no IN ('T101', 'T102', 'T103', 'T104', 'T105');
 -- 1. 用户数据
 -- ============================================================
 INSERT INTO `user` (work_no, name, college, role, password) VALUES
-('T101', '张三', '计算机学院', 'TEACHER', MD5('123456')),
-('T102', '李四', '计算机学院', 'TEACHER', MD5('123456')),
-('T103', '王五', '数学学院', 'TEACHER', MD5('123456')),
-('T104', '赵六', '数学学院', 'TEACHER', MD5('123456')),
-('T105', '钱七', '物理学院', 'TEACHER', MD5('123456'));
+('T101', '张三', '计算机学院', 'TEACHER', '$2b$10$K4hSd.4a/6mFOKq9sLtPReHri7Gc4TCtvgnjG3y0LtxOJNSt4pijy'),
+('T102', '李四', '计算机学院', 'TEACHER', '$2b$10$K4hSd.4a/6mFOKq9sLtPReHri7Gc4TCtvgnjG3y0LtxOJNSt4pijy'),
+('T103', '王五', '数学学院', 'TEACHER', '$2b$10$K4hSd.4a/6mFOKq9sLtPReHri7Gc4TCtvgnjG3y0LtxOJNSt4pijy'),
+('T104', '赵六', '数学学院', 'TEACHER', '$2b$10$K4hSd.4a/6mFOKq9sLtPReHri7Gc4TCtvgnjG3y0LtxOJNSt4pijy'),
+('T105', '钱七', '物理学院', 'TEACHER', '$2b$10$K4hSd.4a/6mFOKq9sLtPReHri7Gc4TCtvgnjG3y0LtxOJNSt4pijy');
 
 SET @u1 = (SELECT id FROM `user` WHERE work_no = 'T101');
 SET @u2 = (SELECT id FROM `user` WHERE work_no = 'T102');
