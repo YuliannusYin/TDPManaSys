@@ -7,12 +7,11 @@ import com.portrait.dto.UserDTO;
 import com.portrait.entity.User;
 import com.portrait.mapper.UserMapper;
 import org.springframework.beans.BeanUtils;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.nio.charset.StandardCharsets;
 
 @Service
 public class UserService {
@@ -22,6 +21,8 @@ public class UserService {
 
     @Resource
     private HttpServletRequest request;
+
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public Page<User> page(Integer pageNum, Integer pageSize, String workNo, String name, String college) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
@@ -47,9 +48,9 @@ public class UserService {
         User entity = new User();
         BeanUtils.copyProperties(dto, entity);
         if (dto.getPassword() == null || dto.getPassword().isEmpty()) {
-            entity.setPassword(DigestUtils.md5DigestAsHex("123456".getBytes(StandardCharsets.UTF_8)));
+            entity.setPassword(passwordEncoder.encode("123456"));
         } else {
-            entity.setPassword(DigestUtils.md5DigestAsHex(dto.getPassword().getBytes(StandardCharsets.UTF_8)));
+            entity.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
         userMapper.insert(entity);
         entity.setPassword(null);
@@ -87,7 +88,7 @@ public class UserService {
     public void resetPassword(Long id) {
         User entity = userMapper.selectById(id);
         if (entity == null) throw new BusinessException("用户不存在");
-        entity.setPassword(DigestUtils.md5DigestAsHex("123456".getBytes(StandardCharsets.UTF_8)));
+        entity.setPassword(passwordEncoder.encode("123456"));
         userMapper.updateById(entity);
     }
 

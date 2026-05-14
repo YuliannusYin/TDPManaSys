@@ -14,7 +14,7 @@ CREATE TABLE `user` (
   `name` VARCHAR(50) NOT NULL COMMENT '姓名',
   `college` VARCHAR(100) COMMENT '学院',
   `role` VARCHAR(20) NOT NULL DEFAULT 'TEACHER' COMMENT '角色: TEACHER/ADMIN',
-  `password` VARCHAR(255) NOT NULL COMMENT '密码(MD5加密)',
+  `password` VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
   `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) COMMENT='用户表';
@@ -174,20 +174,20 @@ CREATE TABLE `score_config` (
 -- 初始数据
 -- ============================================
 
--- 默认管理员: admin / 123456 (MD5)
+-- 默认管理员: admin / 123456 (BCrypt)
 INSERT INTO `user` (`work_no`, `name`, `college`, `role`, `password`) VALUES
-('admin', '系统管理员', '信息中心', 'ADMIN', MD5('123456'));
+('admin', '系统管理员', '信息中心', 'ADMIN', '$2b$10$K4hSd.4a/6mFOKq9sLtPReHri7Gc4TCtvgnjG3y0LtxOJNSt4pijy');
 
--- 默认教师: teacher / 123456 (MD5)
+-- 默认教师: teacher / 123456 (BCrypt)
 INSERT INTO `user` (`work_no`, `name`, `college`, `role`, `password`) VALUES
-('T001', '测试教师', '计算机学院', 'TEACHER', MD5('123456'));
+('T001', '测试教师', '计算机学院', 'TEACHER', '$2b$10$K4hSd.4a/6mFOKq9sLtPReHri7Gc4TCtvgnjG3y0LtxOJNSt4pijy');
 
 SET @u0 = (SELECT id FROM `user` WHERE work_no = 'T001');
 
 INSERT INTO vertical_project (user_id, name, project_no, level, source_unit, start_date, planned_end_date, funding, role, status, remark) VALUES
 (@u0, '人工智能学习吃意大利面', 'VP-T001-001', '国家级', '国家自然科学基金委员会', '2020-01-01', '2023-12-31', 180.00, '主持', '已结题', NULL),
 (@u0, '使用Trae开发全栈项目', 'VP-T001-002', '省部级', '科技部重点研发计划', '2022-06-01', '2025-05-31', 200.00, '主持', '在研', NULL),
-(@u0, 'DeekseepV4-Pro太贵了', 'VP-T001-003', '市厅级', '国家自然科学基金委员会', '2021-01-01', '2024-12-31', 85.00, '参与', '在研', NULL),
+(@u0, 'DeekseepV4-Pro太贵了', 'VP-T001-003', '市厅级', '国家自然科学基金委员会', '2021-01-01', '2024-12-31', 85.00, '参与', '在研', NULL);
 
 
 -- 初始化默认权重

@@ -7,17 +7,18 @@ import com.portrait.entity.User;
 import com.portrait.mapper.UserMapper;
 import com.portrait.util.JwtUtil;
 import com.portrait.vo.LoginVO;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
-import java.nio.charset.StandardCharsets;
 
 @Service
 public class AuthService {
 
     @Resource
     private UserMapper userMapper;
+
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public LoginVO login(LoginDTO loginDTO) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
@@ -28,8 +29,7 @@ public class AuthService {
             throw new BusinessException(401, "工号或密码错误");
         }
 
-        String inputPasswordMd5 = DigestUtils.md5DigestAsHex(loginDTO.getPassword().getBytes(StandardCharsets.UTF_8));
-        if (!inputPasswordMd5.equals(user.getPassword())) {
+        if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
             throw new BusinessException(401, "工号或密码错误");
         }
 
