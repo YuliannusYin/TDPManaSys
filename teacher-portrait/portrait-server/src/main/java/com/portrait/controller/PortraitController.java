@@ -48,6 +48,15 @@ public class PortraitController {
         return Result.success(scoreCalculationService.calculateDashboard(userId));
     }
 
+    @Operation(summary = "全院仪表盘汇总（管理员）")
+    @GetMapping("/dashboard")
+    public Result<PortraitDashboardVO> aggregatedDashboard() {
+        if (!"ADMIN".equals(getCurrentUserRole())) {
+            throw new BusinessException(403, "仅管理员可查看全院汇总");
+        }
+        return Result.success(scoreCalculationService.calculateAggregatedDashboard());
+    }
+
     @Operation(summary = "历年趋势")
     @GetMapping("/{userId}/trend")
     public Result<List<PortraitTrendVO>> trend(@PathVariable Long userId) {

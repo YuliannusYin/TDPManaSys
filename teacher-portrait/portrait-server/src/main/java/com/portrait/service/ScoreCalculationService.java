@@ -56,10 +56,16 @@ public class ScoreCalculationService {
 
     private volatile Map<String, BigDecimal> cachedGlobalMaxes;
 
+    public void clearMaxCache() {
+        cachedGlobalMaxes = null;
+    }
+
     public PortraitRadarVO calculateRadar(Long userId) {
-        User user = userMapper.selectById(userId);
-        Map<String, BigDecimal> raw = calculateRawScores(userId);
-        Map<String, BigDecimal> normalized = normalizeScores(raw, userId);
+        AllUserData d = loadAllData();
+        ensureCache(d);
+        User user = d.userById.get(userId);
+        Map<String, BigDecimal> raw = buildRawScores(userId, d);
+        Map<String, BigDecimal> normalized = normalizeScores(raw);
         PortraitRadarVO vo = new PortraitRadarVO();
         vo.setUserId(userId);
         vo.setUserName(user != null ? user.getName() : "");
@@ -70,61 +76,141 @@ public class ScoreCalculationService {
     }
 
     public PortraitDashboardVO calculateDashboard(Long userId) {
+        AllUserData d = loadAllData();
+        ensureCache(d);
+        return buildDashboard(userId, d);
+    }
+
+    private PortraitDashboardVO buildDashboard(Long userId, AllUserData d) {
         PortraitDashboardVO vo = new PortraitDashboardVO();
-        User user = userMapper.selectById(userId);
+
+        List<VerticalProject> verticalList = d.verticalByUser.getOrDefault(userId, Collections.emptyList());
+        List<HorizontalProject> horizontalList = d.horizontalByUser.getOrDefault(userId, Collections.emptyList());
+        vo.setProjectTotalCount((long) (verticalList.size() + horizontalList.size()));
 
         BigDecimal totalFunding = BigDecimal.ZERO;
-        List<VerticalProject> verticalList = verticalProjectMapper.selectList(
-                new LambdaQueryWrapper<VerticalProject>().eq(VerticalProject::getUserId, userId));
         for (VerticalProject vp : verticalList) {
-            if (vp.getFunding() != null) {
-                totalFunding = totalFunding.add(vp.getFunding());
-            }
+            if (vp.getFunding() != null) totalFunding = totalFunding.add(vp.getFunding());
         }
-        List<HorizontalProject> horizontalList = horizontalProjectMapper.selectList(
-                new LambdaQueryWrapper<HorizontalProject>().eq(HorizontalProject::getUserId, userId));
         for (HorizontalProject hp : horizontalList) {
-            if (hp.getContractAmount() != null) {
-                totalFunding = totalFunding.add(hp.getContractAmount());
-            }
+            if (hp.getContractAmount() != null) totalFunding = totalFunding.add(hp.getContractAmount());
         }
         vo.setTotalFunding(totalFunding);
 
-        List<Paper> paperList = paperMapper.selectList(
-                new LambdaQueryWrapper<Paper>().eq(Paper::getUserId, userId));
-        Map<Long, String> paperClassMap = loadPaperClasses(paperList);
+        List<Paper> paperList = d.paperByUser.getOrDefault(userId, Collections.emptyList());
+        vo.setPaperTotalCount((long) paperList.size());
         long aCount = 0, bCount = 0;
         for (Paper p : paperList) {
-            String cls = paperClassMap.getOrDefault(p.getId(), "D");
+            String cls = d.paperClass.getOrDefault(p.getId(), "D");
             if ("A".equals(cls)) aCount++;
             else if ("B".equals(cls)) bCount++;
         }
         vo.setPaperACount(aCount);
         vo.setPaperBCount(bCount);
 
-        Long patentGranted = patentMapper.selectCount(
-                new LambdaQueryWrapper<Patent>().eq(Patent::getUserId, userId).eq(Patent::getStatus, "已授权"));
+        long patentGranted = 0;
+        for (Patent pt : d.patentByUser.getOrDefault(userId, Collections.emptyList())) {
+            if ("已授权".equals(pt.getStatus())) patentGranted++;
+        }
         vo.setPatentGrantedCount(patentGranted);
 
-        Long softwareCount = softwareCopyrightMapper.selectCount(
-                new LambdaQueryWrapper<SoftwareCopyright>().eq(SoftwareCopyright::getUserId, userId));
-        vo.setSoftwareCount(softwareCount);
+        vo.setSoftwareCount((long) d.swByUser.getOrDefault(userId, Collections.emptyList()).size());
+        vo.setCompetitionAwardCount((long) d.compByUser.getOrDefault(userId, Collections.emptyList()).size());
 
-        Long competitionCount = competitionMapper.selectCount(
-                new LambdaQueryWrapper<Competition>().eq(Competition::getUserId, userId));
-        vo.setCompetitionAwardCount(competitionCount);
-
-        Map<String, BigDecimal> raw = calculateRawScores(userId);
+        Map<String, BigDecimal> raw = buildRawScores(userId, d);
         vo.setRawScores(raw);
-        vo.setNormalizedScores(normalizeScores(raw, userId));
+        vo.setNormalizedScores(normalizeScores(raw));
+
+        return vo;
+    }
+
+    public PortraitDashboardVO calculateAggregatedDashboard() {
+        AllUserData d = loadAllData();
+        ensureCache(d);
+
+        Map<Long, Map<String, BigDecimal>> allRawScores = new LinkedHashMap<>();
+        for (Long uid : d.userById.keySet()) {
+            allRawScores.put(uid, buildRawScores(uid, d));
+        }
+
+        PortraitDashboardVO vo = new PortraitDashboardVO();
+        long totalProjects = 0;
+        BigDecimal totalFunding = BigDecimal.ZERO;
+        long totalPapers = 0, totalA = 0, totalB = 0;
+        long totalPatents = 0, totalSoftware = 0, totalCompetitions = 0;
+
+        Map<String, BigDecimal> aggregatedRaw = new LinkedHashMap<>();
+        for (String dim : DIMS) { aggregatedRaw.put(dim, BigDecimal.ZERO); }
+
+        for (Long uid : d.userById.keySet()) {
+            Map<String, BigDecimal> userRaw = allRawScores.get(uid);
+            for (Map.Entry<String, BigDecimal> e : userRaw.entrySet()) {
+                aggregatedRaw.merge(e.getKey(), e.getValue(), BigDecimal::add);
+            }
+
+            List<VerticalProject> vl = d.verticalByUser.getOrDefault(uid, Collections.emptyList());
+            List<HorizontalProject> hl = d.horizontalByUser.getOrDefault(uid, Collections.emptyList());
+            totalProjects += vl.size() + hl.size();
+            for (VerticalProject vp : vl) {
+                if (vp.getFunding() != null) totalFunding = totalFunding.add(vp.getFunding());
+            }
+            for (HorizontalProject hp : hl) {
+                if (hp.getContractAmount() != null) totalFunding = totalFunding.add(hp.getContractAmount());
+            }
+
+            List<Paper> pl = d.paperByUser.getOrDefault(uid, Collections.emptyList());
+            totalPapers += pl.size();
+            for (Paper p : pl) {
+                String cls = d.paperClass.getOrDefault(p.getId(), "D");
+                if ("A".equals(cls)) totalA++;
+                else if ("B".equals(cls)) totalB++;
+            }
+
+            for (Patent pt : d.patentByUser.getOrDefault(uid, Collections.emptyList())) {
+                if ("已授权".equals(pt.getStatus())) totalPatents++;
+            }
+
+            totalSoftware += d.swByUser.getOrDefault(uid, Collections.emptyList()).size();
+            totalCompetitions += d.compByUser.getOrDefault(uid, Collections.emptyList()).size();
+        }
+
+        vo.setProjectTotalCount(totalProjects);
+        vo.setTotalFunding(totalFunding);
+        vo.setPaperTotalCount(totalPapers);
+        vo.setPaperACount(totalA);
+        vo.setPaperBCount(totalB);
+        vo.setPatentGrantedCount(totalPatents);
+        vo.setSoftwareCount(totalSoftware);
+        vo.setCompetitionAwardCount(totalCompetitions);
+        vo.setRawScores(aggregatedRaw);
+
+        Map<String, BigDecimal> norm = new LinkedHashMap<>();
+        Map<String, BigDecimal> maxes = cachedGlobalMaxes;
+        for (String dim : DIMS) {
+            BigDecimal r = aggregatedRaw.getOrDefault(dim, BigDecimal.ZERO);
+            BigDecimal max = maxes.getOrDefault(dim, BigDecimal.ONE);
+            if (max.compareTo(BigDecimal.ZERO) == 0) max = BigDecimal.ONE;
+            BigDecimal n = r.multiply(BigDecimal.valueOf(100)).divide(max, 2, RoundingMode.HALF_UP);
+            if (n.compareTo(BigDecimal.valueOf(100)) > 0) n = BigDecimal.valueOf(100);
+            norm.put(dim, n);
+        }
+        vo.setNormalizedScores(norm);
 
         return vo;
     }
 
     public List<PortraitRadarVO> compareRadars(List<Long> userIds) {
+        AllUserData d = loadAllData();
         List<PortraitRadarVO> result = new ArrayList<>();
         for (Long uid : userIds) {
-            result.add(calculateRadar(uid));
+            User user = d.userById.get(uid);
+            Map<String, BigDecimal> raw = buildRawScores(uid, d);
+            PortraitRadarVO vo = new PortraitRadarVO();
+            vo.setUserId(uid);
+            vo.setUserName(user != null ? user.getName() : "");
+            vo.setCollege(user != null ? user.getCollege() : "");
+            vo.setRawScores(raw);
+            result.add(vo);
         }
         Map<String, BigDecimal> globalMaxes = new HashMap<>();
         for (PortraitRadarVO vo : result) {
@@ -137,11 +223,13 @@ public class ScoreCalculationService {
         }
         for (PortraitRadarVO vo : result) {
             Map<String, BigDecimal> norm = new LinkedHashMap<>();
-            for (String dim : new String[]{"科研项目", "专利成果", "软件著作", "学术论文", "竞赛指导"}) {
+            for (String dim : DIMS) {
                 BigDecimal raw = vo.getRawScores().getOrDefault(dim, BigDecimal.ZERO);
                 BigDecimal max = globalMaxes.getOrDefault(dim, BigDecimal.ONE);
                 if (max.compareTo(BigDecimal.ZERO) == 0) max = BigDecimal.ONE;
-                norm.put(dim, raw.multiply(BigDecimal.valueOf(100)).divide(max, 2, RoundingMode.HALF_UP));
+                BigDecimal n = raw.multiply(BigDecimal.valueOf(100)).divide(max, 2, RoundingMode.HALF_UP);
+                if (n.compareTo(BigDecimal.valueOf(100)) > 0) n = BigDecimal.valueOf(100);
+                norm.put(dim, n);
             }
             vo.setNormalizedScores(norm);
         }
@@ -265,24 +353,26 @@ public class ScoreCalculationService {
         return vo;
     }
 
-    private Map<String, BigDecimal> calculateRawScores(Long userId) {
+    private Map<String, BigDecimal> buildRawScores(Long userId, AllUserData d) {
         Map<String, BigDecimal> scores = new LinkedHashMap<>();
-        scores.put("科研项目", calcProjectScore(userId));
-        scores.put("专利成果", calcPatentScore(userId));
-        scores.put("软件著作", calcSoftwareScore(userId));
-        scores.put("学术论文", calcPaperScore(userId));
-        scores.put("竞赛指导", calcCompetitionScore(userId));
+        scores.put("科研项目", calcProjectScore(userId, d));
+        scores.put("专利成果", calcPatentScore(userId, d));
+        scores.put("软件著作", calcSoftwareScore(userId, d));
+        scores.put("学术论文", calcPaperScore(userId, d));
+        scores.put("竞赛指导", calcCompetitionScore(userId, d));
         return scores;
     }
 
-    private Map<String, BigDecimal> normalizeScores(Map<String, BigDecimal> raw, Long excludeUserId) {
+    private Map<String, BigDecimal> normalizeScores(Map<String, BigDecimal> raw) {
         Map<String, BigDecimal> globalMaxes = getGlobalMaxes();
         Map<String, BigDecimal> normalized = new LinkedHashMap<>();
-        for (String dim : new String[]{"科研项目", "专利成果", "软件著作", "学术论文", "竞赛指导"}) {
+        for (String dim : DIMS) {
             BigDecimal r = raw.getOrDefault(dim, BigDecimal.ZERO);
             BigDecimal max = globalMaxes.getOrDefault(dim, BigDecimal.ONE);
             if (max.compareTo(BigDecimal.ZERO) == 0) max = BigDecimal.ONE;
-            normalized.put(dim, r.multiply(BigDecimal.valueOf(100)).divide(max, 2, RoundingMode.HALF_UP));
+            BigDecimal norm = r.multiply(BigDecimal.valueOf(100)).divide(max, 2, RoundingMode.HALF_UP);
+            if (norm.compareTo(BigDecimal.valueOf(100)) > 0) norm = BigDecimal.valueOf(100);
+            normalized.put(dim, norm);
         }
         return normalized;
     }
@@ -295,32 +385,14 @@ public class ScoreCalculationService {
             if (cachedGlobalMaxes != null) {
                 return cachedGlobalMaxes;
             }
-            Map<String, BigDecimal> globalMaxes = new LinkedHashMap<>();
-            for (String dim : new String[]{"科研项目", "专利成果", "软件著作", "学术论文", "竞赛指导"}) {
-                globalMaxes.put(dim, BigDecimal.ZERO);
-            }
-            List<User> allUsers = userMapper.selectList(null);
-            for (User u : allUsers) {
-                Map<String, BigDecimal> ur = calculateRawScores(u.getId());
-                for (Map.Entry<String, BigDecimal> e : ur.entrySet()) {
-                    if (e.getValue().compareTo(globalMaxes.get(e.getKey())) > 0) {
-                        globalMaxes.put(e.getKey(), e.getValue());
-                    }
-                }
-            }
-            cachedGlobalMaxes = globalMaxes;
-            return globalMaxes;
+            cachedGlobalMaxes = buildGlobalMaxes(loadAllData());
+            return cachedGlobalMaxes;
         }
     }
 
-    public void clearMaxCache() {
-        cachedGlobalMaxes = null;
-    }
-
-    private BigDecimal calcProjectScore(Long userId) {
+    private BigDecimal calcProjectScore(Long userId, AllUserData d) {
         BigDecimal score = BigDecimal.ZERO;
-        List<VerticalProject> vList = verticalProjectMapper.selectList(
-                new LambdaQueryWrapper<VerticalProject>().eq(VerticalProject::getUserId, userId));
+        List<VerticalProject> vList = d.verticalByUser.getOrDefault(userId, Collections.emptyList());
         for (VerticalProject vp : vList) {
             BigDecimal base = BigDecimal.ZERO;
             switch (vp.getLevel() != null ? vp.getLevel() : "") {
@@ -334,8 +406,7 @@ public class ScoreCalculationService {
             }
             score = score.add(base);
         }
-        List<HorizontalProject> hList = horizontalProjectMapper.selectList(
-                new LambdaQueryWrapper<HorizontalProject>().eq(HorizontalProject::getUserId, userId));
+        List<HorizontalProject> hList = d.horizontalByUser.getOrDefault(userId, Collections.emptyList());
         for (HorizontalProject hp : hList) {
             BigDecimal base = BigDecimal.ZERO;
             if ("主持".equals(hp.getRole()) && hp.getContractAmount() != null) {
@@ -348,10 +419,9 @@ public class ScoreCalculationService {
         return score.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calcPatentScore(Long userId) {
+    private BigDecimal calcPatentScore(Long userId, AllUserData d) {
         BigDecimal score = BigDecimal.ZERO;
-        List<Patent> pList = patentMapper.selectList(
-                new LambdaQueryWrapper<Patent>().eq(Patent::getUserId, userId));
+        List<Patent> pList = d.patentByUser.getOrDefault(userId, Collections.emptyList());
         for (Patent p : pList) {
             BigDecimal base = BigDecimal.ZERO;
             switch (p.getType() != null ? p.getType() : "") {
@@ -363,28 +433,22 @@ public class ScoreCalculationService {
                 base = base.multiply(BigDecimal.valueOf(0.5));
             }
             score = score.add(base);
-
-            Long transferCount = patentTransferMapper.selectCount(
-                    new LambdaQueryWrapper<PatentTransfer>().eq(PatentTransfer::getPatentId, p.getId()));
+            Long transferCount = d.transferCountByPatent.getOrDefault(p.getId(), 0L);
             score = score.add(BigDecimal.valueOf(5).multiply(BigDecimal.valueOf(transferCount)));
         }
         return score.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calcSoftwareScore(Long userId) {
-        Long count = softwareCopyrightMapper.selectCount(
-                new LambdaQueryWrapper<SoftwareCopyright>().eq(SoftwareCopyright::getUserId, userId));
-        return BigDecimal.valueOf(10).multiply(BigDecimal.valueOf(count)).setScale(2, RoundingMode.HALF_UP);
+    private BigDecimal calcSoftwareScore(Long userId, AllUserData d) {
+        List<SoftwareCopyright> list = d.swByUser.getOrDefault(userId, Collections.emptyList());
+        return BigDecimal.valueOf(10).multiply(BigDecimal.valueOf(list.size())).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calcPaperScore(Long userId) {
-        List<Paper> paperList = paperMapper.selectList(
-                new LambdaQueryWrapper<Paper>().eq(Paper::getUserId, userId));
-        Map<Long, String> classMap = loadPaperClasses(paperList);
-
+    private BigDecimal calcPaperScore(Long userId, AllUserData d) {
+        List<Paper> paperList = d.paperByUser.getOrDefault(userId, Collections.emptyList());
         BigDecimal score = BigDecimal.ZERO;
         for (Paper p : paperList) {
-            String cls = classMap.getOrDefault(p.getId(), "D");
+            String cls = d.paperClass.getOrDefault(p.getId(), "D");
             BigDecimal base = BigDecimal.ZERO;
             switch (cls) {
                 case "A": base = BigDecimal.valueOf(25); break;
@@ -400,9 +464,8 @@ public class ScoreCalculationService {
         return score.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calcCompetitionScore(Long userId) {
-        List<Competition> cList = competitionMapper.selectList(
-                new LambdaQueryWrapper<Competition>().eq(Competition::getUserId, userId));
+    private BigDecimal calcCompetitionScore(Long userId, AllUserData d) {
+        List<Competition> cList = d.compByUser.getOrDefault(userId, Collections.emptyList());
         BigDecimal score = BigDecimal.ZERO;
         for (Competition c : cList) {
             BigDecimal base = BigDecimal.ZERO;
@@ -469,4 +532,92 @@ public class ScoreCalculationService {
             default: return 0;
         }
     }
+
+    private static class AllUserData {
+        final Map<Long, User> userById = new LinkedHashMap<>();
+        final Map<Long, List<VerticalProject>> verticalByUser = new LinkedHashMap<>();
+        final Map<Long, List<HorizontalProject>> horizontalByUser = new LinkedHashMap<>();
+        final Map<Long, List<Paper>> paperByUser = new LinkedHashMap<>();
+        final Map<Long, String> paperClass = new LinkedHashMap<>();
+        final Map<Long, List<Patent>> patentByUser = new LinkedHashMap<>();
+        final Map<Long, Long> transferCountByPatent = new LinkedHashMap<>();
+        final Map<Long, List<SoftwareCopyright>> swByUser = new LinkedHashMap<>();
+        final Map<Long, List<Competition>> compByUser = new LinkedHashMap<>();
+    }
+
+    private AllUserData loadAllData() {
+        AllUserData d = new AllUserData();
+
+        List<User> allUsers = userMapper.selectList(null);
+        for (User u : allUsers) {
+            d.userById.put(u.getId(), u);
+        }
+
+        for (VerticalProject vp : verticalProjectMapper.selectList(null)) {
+            d.verticalByUser.computeIfAbsent(vp.getUserId(), k -> new ArrayList<>()).add(vp);
+        }
+        for (HorizontalProject hp : horizontalProjectMapper.selectList(null)) {
+            d.horizontalByUser.computeIfAbsent(hp.getUserId(), k -> new ArrayList<>()).add(hp);
+        }
+        for (SoftwareCopyright sw : softwareCopyrightMapper.selectList(null)) {
+            d.swByUser.computeIfAbsent(sw.getUserId(), k -> new ArrayList<>()).add(sw);
+        }
+        for (Competition c : competitionMapper.selectList(null)) {
+            d.compByUser.computeIfAbsent(c.getUserId(), k -> new ArrayList<>()).add(c);
+        }
+
+        List<Paper> allPapers = paperMapper.selectList(null);
+        for (Paper p : allPapers) {
+            d.paperByUser.computeIfAbsent(p.getUserId(), k -> new ArrayList<>()).add(p);
+        }
+        if (!allPapers.isEmpty()) {
+            List<Long> paperIds = allPapers.stream().map(Paper::getId).collect(Collectors.toList());
+            List<PaperIndex> allIndexes = paperIndexMapper.selectList(
+                    new LambdaQueryWrapper<PaperIndex>().in(PaperIndex::getPaperId, paperIds));
+            for (PaperIndex pi : allIndexes) {
+                String cls = indexTypeToClass(pi.getIndexType());
+                String existing = d.paperClass.get(pi.getPaperId());
+                if (existing == null || classPriority(cls) > classPriority(existing)) {
+                    d.paperClass.put(pi.getPaperId(), cls);
+                }
+            }
+            for (Paper p : allPapers) {
+                d.paperClass.putIfAbsent(p.getId(), "D");
+            }
+        }
+
+        for (Patent pt : patentMapper.selectList(null)) {
+            d.patentByUser.computeIfAbsent(pt.getUserId(), k -> new ArrayList<>()).add(pt);
+        }
+        List<PatentTransfer> allTransfers = patentTransferMapper.selectList(null);
+        for (PatentTransfer t : allTransfers) {
+            d.transferCountByPatent.merge(t.getPatentId(), 1L, Long::sum);
+        }
+
+        return d;
+    }
+
+    private void ensureCache(AllUserData d) {
+        if (cachedGlobalMaxes != null) return;
+        synchronized (this) {
+            if (cachedGlobalMaxes != null) return;
+            cachedGlobalMaxes = buildGlobalMaxes(d);
+        }
+    }
+
+    private Map<String, BigDecimal> buildGlobalMaxes(AllUserData d) {
+        Map<String, BigDecimal> maxes = new LinkedHashMap<>();
+        for (String dim : DIMS) { maxes.put(dim, BigDecimal.ZERO); }
+        for (Long uid : d.userById.keySet()) {
+            Map<String, BigDecimal> ur = buildRawScores(uid, d);
+            for (Map.Entry<String, BigDecimal> e : ur.entrySet()) {
+                if (e.getValue().compareTo(maxes.get(e.getKey())) > 0) {
+                    maxes.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return maxes;
+    }
+
+    private static final String[] DIMS = {"科研项目", "专利成果", "软件著作", "学术论文", "竞赛指导"};
 }

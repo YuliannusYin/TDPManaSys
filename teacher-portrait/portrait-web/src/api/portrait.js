@@ -23,3 +23,7 @@ export function getPortraitTeachers() {
 export function getPortraitDistribution(userId) {
   return request({ url: `/portrait/${userId}/distribution`, method: 'get' })
 }
+
+export function getAggregatedDashboard() {
+  return request({ url: `/portrait/dashboard`, method: 'get' })
+}
