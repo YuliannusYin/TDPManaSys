@@ -33,7 +33,7 @@ function buildOption() {
 
   const series = [{
     name: '数量', type: 'bar', data: vals,
-    itemStyle: { color: '#5470C6', borderRadius: [4, 4, 0, 0] }
+    itemStyle: { color: '#4a7ebf', borderRadius: [4, 4, 0, 0] }
   }]
   const yAxes = [{ type: 'value', name: '数量', minInterval: 1 }]
 
@@ -41,7 +41,7 @@ function buildOption() {
     const funds = props.trendData.map(d => Number(d.projectFunding || 0))
     series.push({
       name: '经费(万元)', type: 'line', yAxisIndex: 1,
-      data: funds, lineStyle: { color: '#EE6666' }, itemStyle: { color: '#EE6666' }
+      data: funds, lineStyle: { color: '#c4564e' }, itemStyle: { color: '#c4564e' }
     })
     yAxes.push({ type: 'value', name: '经费(万元)' })
   }

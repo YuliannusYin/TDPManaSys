@@ -20,7 +20,7 @@ const activeTab = ref('projectLevel')
 const chartRef = ref(null)
 let chartInstance = null
 
-const COLORS = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE', '#FC8452', '#9A60B4', '#3BA272']
+const COLORS = ['#4a7ebf', '#4a9e6e', '#c8a45c', '#c4564e', '#5a8abf', '#bf8a3a', '#6a5abf', '#4a9e9e']
 
 async function loadData() {
   if (!props.userId) return

@@ -1,71 +1,54 @@
 <template>
   <div class="portrait-page">
     <div class="page-header">
-      <h2 class="page-title">数字画像</h2>
-      <el-select v-if="isAdmin" v-model="selectedUserId" placeholder="选择教师" filterable style="width:220px" @change="onUserChange">
+      <div>
+        <h2 class="page-title">数字画像</h2>
+        <p class="page-desc">多维度科研成果综合评估与可视化分析</p>
+      </div>
+      <el-select v-if="isAdmin" v-model="selectedUserId" placeholder="选择教师" filterable style="width:240px" @change="onUserChange">
         <el-option v-for="u in teacherList" :key="u.id" :label="u.name + ' (' + u.college + ')'" :value="u.id" />
       </el-select>
-      <span v-else class="current-user">{{ userStore.userName || '当前用户' }}</span>
+      <span v-else class="current-user-badge">{{ userStore.userName || '当前用户' }}</span>
     </div>
 
-    <el-row :gutter="16" class="summary-row">
-      <el-col :span="4">
-        <el-card shadow="hover" class="summary-card">
-          <div class="card-value">{{ fmtMoney(dashboard.totalFunding) }}</div>
-          <div class="card-label">项目总经费(万)</div>
-        </el-card>
-      </el-col>
-      <el-col :span="4">
-        <el-card shadow="hover" class="summary-card">
-          <div class="card-value">{{ dashboard.paperACount }} / {{ dashboard.paperBCount }}</div>
-          <div class="card-label">A/B类论文</div>
-        </el-card>
-      </el-col>
-      <el-col :span="4">
-        <el-card shadow="hover" class="summary-card">
-          <div class="card-value">{{ dashboard.patentGrantedCount }}</div>
-          <div class="card-label">已授权专利</div>
-        </el-card>
-      </el-col>
-      <el-col :span="4">
-        <el-card shadow="hover" class="summary-card">
-          <div class="card-value">{{ dashboard.softwareCount }}</div>
-          <div class="card-label">软件著作</div>
-        </el-card>
-      </el-col>
-      <el-col :span="4">
-        <el-card shadow="hover" class="summary-card">
-          <div class="card-value">{{ dashboard.competitionAwardCount }}</div>
-          <div class="card-label">竞赛获奖</div>
-        </el-card>
-      </el-col>
-      <el-col :span="4">
-        <el-card shadow="hover" class="summary-card">
-          <div class="card-value" :style="{ color: scoreColor(avgScore) }">{{ avgScore.toFixed(1) }}</div>
-          <div class="card-label">综合均分</div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="summary-grid">
+      <div v-for="item in summaryItems" :key="item.label" class="summary-card" :style="{ '--card-accent': item.accent }">
+        <div class="summary-value" :style="{ color: item.colorFn ? item.colorFn(item.value) : 'var(--color-text-primary)' }">{{ item.display }}</div>
+        <div class="summary-label">{{ item.label }}</div>
+      </div>
+    </div>
 
-    <el-row :gutter="16" style="margin-top:16px">
+    <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="12">
         <el-card shadow="never">
-          <template #header><span class="card-title">综合能力雷达图</span></template>
+          <template #header>
+            <div class="section-header">
+              <span class="section-title">综合能力雷达图</span>
+            </div>
+          </template>
           <RadarChart ref="radarRef" :radar-data="radarData" :compare-mode="compareMode" :compare-data="compareData" :teacher-list="teacherList" @update:compare-data="onCompareData" />
         </el-card>
       </el-col>
       <el-col :span="12">
         <el-card shadow="never">
-          <template #header><span class="card-title">成果分布</span></template>
+          <template #header>
+            <div class="section-header">
+              <span class="section-title">成果分布</span>
+            </div>
+          </template>
           <DistributionChart :user-id="selectedUserId" />
         </el-card>
       </el-col>
     </el-row>
 
-    <el-row :gutter="16" style="margin-top:16px">
+    <el-row :gutter="20" style="margin-top: 20px;">
       <el-col :span="24">
         <el-card shadow="never">
-          <template #header><span class="card-title">历年趋势</span></template>
+          <template #header>
+            <div class="section-header">
+              <span class="section-title">历年趋势</span>
+            </div>
+          </template>
           <TrendChart :trend-data="trendData" />
         </el-card>
       </el-col>
@@ -103,9 +86,21 @@ const avgScore = computed(() => {
   return dims.length > 0 ? sum / dims.length : 0
 })
 
-function scoreColor(v) { return v >= 60 ? '#67C23A' : v >= 30 ? '#E6A23C' : '#F56C6C' }
+function scoreColor(v) { return v >= 60 ? 'var(--color-success)' : v >= 30 ? 'var(--color-warning)' : 'var(--color-danger)' }
 
 function fmtMoney(v) { return v ? Number(v).toFixed(1) : '0.0' }
+
+const summaryItems = computed(() => {
+  const d = dashboard.value
+  return [
+    { label: '项目总经费(万)', display: fmtMoney(d.totalFunding), accent: 'var(--color-teal)' },
+    { label: 'A/B类论文', display: `${d.paperACount} / ${d.paperBCount}`, accent: 'var(--color-rose)' },
+    { label: '已授权专利', display: d.patentGrantedCount, accent: 'var(--color-amber)' },
+    { label: '软件著作', display: d.softwareCount, accent: 'var(--color-info)' },
+    { label: '竞赛获奖', display: d.competitionAwardCount, accent: 'var(--color-success)' },
+    { label: '综合均分', display: avgScore.value.toFixed(1), accent: 'var(--color-accent)', colorFn: scoreColor, value: avgScore.value },
+  ]
+})
 
 async function loadTeachers() {
   try {
@@ -152,13 +147,101 @@ watch(() => route.params.userId, (val) => {
 </script>
 
 <style scoped>
-.portrait-page { padding: 0; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.page-title { font-size: 20px; color: #303133; }
-.current-user { font-size: 16px; color: #409EFF; font-weight: bold; }
-.summary-row { margin-bottom: 0; }
-.summary-card { text-align: center; cursor: default; }
-.summary-card .card-value { font-size: 28px; font-weight: bold; color: #303133; }
-.summary-card .card-label { font-size: 13px; color: #909399; margin-top: 4px; }
-.card-title { font-size: 15px; font-weight: bold; color: #303133; }
+.portrait-page {
+  max-width: 1200px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 4px;
+}
+
+.page-desc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.current-user-badge {
+  font-size: 14px;
+  color: var(--color-accent);
+  font-weight: 600;
+  padding: 6px 16px;
+  background: var(--color-accent-glow);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(200, 164, 92, 0.2);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+}
+
+.summary-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 20px 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.summary-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: var(--card-accent);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.summary-card:hover::after {
+  opacity: 1;
+}
+
+.summary-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 6px;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
 </style>
