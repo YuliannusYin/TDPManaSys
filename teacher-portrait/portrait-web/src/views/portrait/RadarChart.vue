@@ -34,7 +34,7 @@ const chartRef = ref(null)
 let chartInstance = null
 
 const dims = ['科研项目', '专利成果', '软件著作', '学术论文', '竞赛指导']
-const colors = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE']
+const colors = ['#4a7ebf', '#4a9e6e', '#c8a45c', '#c4564e', '#6a5abf']
 
 function buildOption() {
   const indicators = dims.map(d => ({ name: d, max: 100 }))
@@ -57,7 +57,7 @@ function buildOption() {
       center: ['50%', '52%'],
       radius: '60%',
       indicator: indicators,
-      axisName: { color: '#606266', fontSize: 12 }
+      axisName: { color: '#5a6478', fontSize: 12 }
     },
     series: [{
       type: 'radar',
