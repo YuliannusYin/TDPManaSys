@@ -52,7 +52,7 @@
         </el-menu-item>
 
         <el-menu-item index="/competition">
-          <el-icon><TrophyBase /></el-icon>
+          <el-icon><Trophy /></el-icon>
           <span>竞赛指导</span>
         </el-menu-item>
 
@@ -111,7 +111,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../store/user'
 import {
   DataAnalysis, FolderOpened, Document, Monitor, Reading,
-  TrophyBase, PieChart, Setting, Fold, Expand, SwitchButton
+  Trophy, PieChart, Setting, Fold, Expand, SwitchButton
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
