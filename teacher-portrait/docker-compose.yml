@@ -3,13 +3,10 @@ services:
     image: mysql:8.0
     container_name: teacher-portrait-mysql
     restart: unless-stopped
-    ports:
-      - "3308:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: teacher_portrait
       TZ: Asia/Shanghai
-      JWT_SECRET: ${JWT_SECRET}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -19,6 +16,50 @@ services:
       - --default-time-zone=+08:00
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./portrait-server/src/main/resources/db/migration/V1__init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./portrait-server/src/main/resources/db/test-data.sql:/docker-entrypoint-initdb.d/02-test-data.sql:ro
+    networks:
+      - portrait-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  portrait-server:
+    build:
+      context: ./portrait-server
+      dockerfile: Dockerfile
+    container_name: teacher-portrait-server
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/teacher_portrait?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&connectionCollation=utf8mb4_unicode_ci
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      CORS_ALLOWED_ORIGINS: http://localhost,http://localhost:80,http://localhost:8080
+      JWT_SECRET: ${JWT_SECRET:-teacher-portrait-prod-secret-key-2026}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - portrait-net
+
+  portrait-web:
+    build:
+      context: ./portrait-web
+      dockerfile: Dockerfile
+    container_name: teacher-portrait-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - portrait-server
+    networks:
+      - portrait-net
 
 volumes:
   mysql_data:
+
+networks:
+  portrait-net:
+    driver: bridge

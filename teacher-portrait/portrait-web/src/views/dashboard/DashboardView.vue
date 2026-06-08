@@ -30,7 +30,7 @@
             </div>
           </template>
           <div class="quick-grid">
-            <div v-for="item in quickLinks" :key="item.path" class="quick-item" @click="router.push(item.path)">
+            <div v-for="item in quickLinksResolved" :key="item.path" class="quick-item" @click="router.push(item.path)">
               <div class="quick-icon" :style="{ background: item.bg }">
                 <el-icon :size="20" color="#fff"><component :is="item.icon" /></el-icon>
               </div>
@@ -65,7 +65,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../store/user'
 import { getPortraitDashboard, getAggregatedDashboard } from '../../api/portrait'
-import { Document, Collection, TrophyBase, DataBoard, Money, Files, FolderOpened, Reading, PieChart } from '@element-plus/icons-vue'
+import { Document, Collection, Trophy, DataBoard, Money, Files, FolderOpened, Reading, PieChart } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -91,7 +91,7 @@ const cards = computed(() => {
   return [
     { label: '项目总数', value: d.projectTotalCount ?? '-', icon: Document, accent: 'var(--color-blue)' },
     { label: '项目总经费(万)', value: fmtMoney(d.totalFunding), icon: Money, accent: 'var(--color-teal)' },
-    { label: '已授权专利', value: d.patentGrantedCount ?? '-', icon: TrophyBase, accent: 'var(--color-amber)' },
+    { label: '已授权专利', value: d.patentGrantedCount ?? '-', icon: Trophy, accent: 'var(--color-amber)' },
     { label: '软件著作', value: d.softwareCount ?? '-', icon: Files, accent: 'var(--color-info)' },
     { label: '学术论文', value: d.paperTotalCount ?? '-', sub: d.paperACount != null ? `A类 ${d.paperACount} / B类 ${d.paperBCount}` : '', icon: DataBoard, accent: 'var(--color-rose)' },
     { label: '竞赛获奖', value: d.competitionAwardCount ?? '-', icon: Collection, accent: 'var(--color-success)' }
@@ -101,7 +101,7 @@ const cards = computed(() => {
 const quickLinks = [
   { label: '纵向项目', path: '/project/vertical', icon: FolderOpened, bg: 'var(--color-blue)' },
   { label: '横向项目', path: '/project/horizontal', icon: FolderOpened, bg: 'var(--color-teal)' },
-  { label: '专利管理', path: '/patent', icon: TrophyBase, bg: 'var(--color-amber)' },
+  { label: '专利管理', path: '/patent', icon: Trophy, bg: 'var(--color-amber)' },
   { label: '论文管理', path: '/paper', icon: Reading, bg: 'var(--color-rose)' },
   { label: '数字画像', path: '', icon: PieChart, bg: 'var(--color-primary)' },
 ]
