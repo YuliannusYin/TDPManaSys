@@ -132,7 +132,7 @@ public class PaperService {
         if (entity == null) {
             throw new BusinessException("论文不存在");
         }
-        if (!entity.getUserId().equals(getCurrentUserId())) {
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
             throw new BusinessException("无权修改他人数据");
         }
         checkDoiUnique(dto.getDoi(), id);
@@ -153,7 +153,7 @@ public class PaperService {
         if (entity == null) {
             throw new BusinessException("论文不存在");
         }
-        if (!entity.getUserId().equals(getCurrentUserId())) {
+        if ("TEACHER".equals(getCurrentUserRole()) && !entity.getUserId().equals(getCurrentUserId())) {
             throw new BusinessException("无权删除他人数据");
         }
         paperIndexMapper.delete(new LambdaQueryWrapper<PaperIndex>().eq(PaperIndex::getPaperId, id));
@@ -163,13 +163,12 @@ public class PaperService {
 
     private void saveIndexTypes(Long paperId, List<String> indexTypes) {
         if (indexTypes != null && !indexTypes.isEmpty()) {
-            List<PaperIndex> list = indexTypes.stream().map(type -> {
+            for (String type : indexTypes) {
                 PaperIndex pi = new PaperIndex();
                 pi.setPaperId(paperId);
                 pi.setIndexType(type);
-                return pi;
-            }).collect(Collectors.toList());
-            paperIndexMapper.insert(list);
+                paperIndexMapper.insert(pi);
+            }
         }
     }
 
