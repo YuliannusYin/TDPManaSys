@@ -257,18 +257,35 @@ const avatarLetter = computed(() => {
 })
 
 // ========== 底部 TabBar 配置 ==========
+// 新结构：首页、项目（含二级导航）、画像、管理（含二级导航）
+// 移除原有的"成果"栏目，将其合并到"项目"中
 const tabbarItems = computed(() => [
   { label: '首页', path: '/dashboard', icon: DataAnalysis },
-  { label: '项目', path: '/project/vertical', icon: FolderOpened },
-  { label: '成果', path: '/patent', icon: Document },
+  { label: '项目', path: '/mobile/projects', icon: FolderOpened },
   { label: '画像', path: portraitPath.value, icon: PieChart },
-  ...(userStore.role === 'ADMIN' ? [{ label: '管理', path: '/admin/users', icon: Setting }] : [])
+  ...(userStore.role === 'ADMIN' ? [{ label: '管理', path: '/mobile/admin', icon: Setting }] : [])
 ])
 
 const isActiveTab = (path) => {
   const currentPath = route.path
-  if (path === '/project/vertical' && currentPath.startsWith('/project')) return true
-  if (path === '/patent' && (currentPath.startsWith('/patent') || currentPath.startsWith('/software') || currentPath.startsWith('/paper') || currentPath.startsWith('/competition'))) return true
+  // 项目栏目：包含所有项目相关路径
+  if (path === '/mobile/projects' && (
+    currentPath.startsWith('/project') || 
+    currentPath.startsWith('/patent') || 
+    currentPath.startsWith('/software') || 
+    currentPath.startsWith('/paper') || 
+    currentPath.startsWith('/competition') ||
+    currentPath.startsWith('/mobile/projects') ||
+    currentPath.startsWith('/mobile/project')
+  )) return true
+  // 管理栏目：包含所有管理相关路径
+  if (path === '/mobile/admin' && (
+    currentPath.startsWith('/admin') ||
+    currentPath.startsWith('/mobile/admin')
+  )) return true
+  // 画像栏目
+  if (path.startsWith('/portrait') && currentPath.startsWith('/portrait')) return true
+  // 首页
   return currentPath === path || currentPath.startsWith(path + '/')
 }
 
